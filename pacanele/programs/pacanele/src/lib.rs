@@ -1,9 +1,9 @@
 use anchor_lang::prelude::*;
 
-declare_id!("7eKDiZL6sPH4tKUkNjyjQeL7crKPoTXxVG3w5VGC1CJB");
+declare_id!("A3NxPbGv9f9y6j7mEmMeptZp7n8CYYyJxZeuMde68Gi6");
 
 #[program]
-pub mod program_pacanele {
+pub mod pacanele {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {

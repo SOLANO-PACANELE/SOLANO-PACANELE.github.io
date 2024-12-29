@@ -5,14 +5,14 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-anchor_workspace = "7eKDiZL6sPH4tKUkNjyjQeL7crKPoTXxVG3w5VGC1CJB"
+pacanele = "A3NxPbGv9f9y6j7mEmMeptZp7n8CYYyJxZeuMde68Gi6"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
 cluster = "Localnet"
-wallet = 'solana_id.json'
+wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "cargo test"
