@@ -19,9 +19,4 @@ docker run \
 sleep 2
 until docker exec solana solana balance; do sleep 1; done
 echo "SOLANA OK"
-mkdir -p ~/.config/solana
-# docker exec solana cat /root/.config/solana/id.json > ~/.config/solana/id.json
-# solana balance
-# echo "balance ok"
-
-docker exec -it solana bash
+echo "visit http://localhost:3000"
