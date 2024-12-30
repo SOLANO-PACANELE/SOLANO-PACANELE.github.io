@@ -1,3 +1,0 @@
-#!/bin/bash
-set -ex
-docker exec -it solana solana $@

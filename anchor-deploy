@@ -1,3 +1,0 @@
-#!/bin/bash
-set -ex
-docker exec -it solana bash -c "set -ex && cd pacanele && anchor build && anchor deploy"
