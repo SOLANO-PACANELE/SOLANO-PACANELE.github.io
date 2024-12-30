@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("A3NxPbGv9f9y6j7mEmMeptZp7n8CYYyJxZeuMde68Gi6");
+declare_id!("5zyZQVoK55mDrTr9pWJKhqX9uMp6xD6eDdsdQrqeWKXR");
 
 #[program]
 pub mod pacanele {

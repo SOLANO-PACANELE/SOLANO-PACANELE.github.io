@@ -1,0 +1,19 @@
+{
+    "rust-analyzer.cargo.targetDir": "target_rust_analyzer",
+    // "rust-analyzer.cargo.extraArgs": ["--target-dir", "target_rust_analyzer"],  # cannot be used multiple times
+    "rust-analyzer.linkedProjects": [
+        "pacanele/Cargo.toml",
+        "frontend/Cargo.toml",
+    ],
+    "rust-analyzer.statusBar.documentSelector": [
+        {
+            "language": "rust"
+        },
+        {
+            "pattern": "**/Cargo.toml"
+        },
+        {
+            "pattern": "**/Cargo.lock"
+        }
+    ]
+}
