@@ -4,7 +4,6 @@ export MSYS_NO_PATHCONV=1
 export MSYS2_ARG_CONV_EXCL="*"
 export MSYS_NO_PATHCONV=1
 
-solana --version || ( echo "plz install solana v2.1.6 from anza agave command line tools" && exit 1 )
 
 docker rm -f solana || true
 docker run \
