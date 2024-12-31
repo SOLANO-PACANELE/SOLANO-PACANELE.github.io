@@ -1,4 +1,5 @@
 use dioxus::prelude::*;
+use dioxus_logger::tracing::{Level, info};
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
@@ -12,16 +13,32 @@ const FAVICON: Asset = asset!("/assets/favicon.ico");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 
 fn main() {
+    dioxus_logger::init(Level::INFO).expect("logger failed to init");
     dioxus::launch(App);
 }
-
 #[component]
 fn App() -> Element {
     rsx! {
         document::Link { rel: "icon", href: FAVICON }
         document::Link { rel: "stylesheet", href: MAIN_CSS }
+        document::Style {
+            {make_animation_string()}
+        }
         Router::<Route> {}
     }
+}
+
+fn make_animation_string() -> String {
+    let mut css = "".to_string();
+    css.push_str("@keyframes spin { ");
+    for x in 0..=100 {
+        let rot = format!("{} deg", 360 * x / 100);
+        let line_rule = format!("  rotate3d(1, 0, 0, 360deg ) ");
+        let line_css = format!("{x}% {{ {line_rule} }}");
+        css.push_str(&line_css);
+    }
+    css.push_str("}");
+    css
 }
 
 
