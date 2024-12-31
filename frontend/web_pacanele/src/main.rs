@@ -32,8 +32,8 @@ fn make_animation_string() -> String {
     let mut css = "".to_string();
     css.push_str("@keyframes spin { ");
     for x in 0..=100 {
-        let rot = format!("{} deg", 360 * x / 100);
-        let line_rule = format!("  rotate3d(1, 0, 0, 360deg ) ");
+        let rot = format!("{}deg", 360 * x / 100);
+        let line_rule = format!(" transform: rotate3d(1, 0, 0, {rot} ) ; ");
         let line_css = format!("{x}% {{ {line_rule} }}");
         css.push_str(&line_css);
     }
