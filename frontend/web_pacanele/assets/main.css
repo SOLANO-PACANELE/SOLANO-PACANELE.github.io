@@ -1,22 +1,28 @@
+body,div {
+    border: 0px;
+    margin: 0px;
+}
+
 #pacanele {
     position: absolute;
     
-    width: 50vw;
+    width: 51.5vw;
     height: 50vh;
     border: 0px;
     margin: 0px;
     left: 25vw;
     top: 25vh;
     border: 1px solid red;
-
     container-type: size;
 
 }
 
-#777 {
-    width: 99cqmin;
-    height: 33cqmin;
+#x777 {
+    width: 297cqmin;
+    height: 99cqmin;
     container-type: size;
+    margin: auto;
+    border: 1px solid yellow;
 }
 
 body {
@@ -33,24 +39,21 @@ html, body {
 
 #slot1, #slot2, #slot3 {
     width: 33cqmin;
-    height: 100cqmin;
+    height: 99cqmin;
     display: table-cell;
     border: 1px solid black;
-    padding: 3px;
-    margin : 3px;
+    padding: 0px;
+    margin : 0px;
     container-type: size;
 }
-
-
-
 
 #top-box {
     border: 1px solid red;
     position:absolute;
     top: 5vh;
-    left: 10vw;
+    left: 5vw;
     height: 15vh;
-    width: 80vw;
+    width: 90vw;
 }
 
 #left-box {
@@ -58,7 +61,7 @@ html, body {
     position:absolute;
     top: 25vh;
     left: 5vw;
-    height: 65vh;
+    height: 68vh;
     width: 18vw;
 }
 
@@ -68,7 +71,7 @@ html, body {
     bottom: 5vh;
     left: 25vw;
     height: 15vh;
-    width: 49.5vw;
+    width: 51.5vw;
 }
 
 #right-box {
@@ -76,12 +79,13 @@ html, body {
     position:absolute;
     bottom: 5vh;
     right: 5vw;
-    height: 68vh;
-    width: 18.5vw;
+    height: 69.5vh;
+    width: 16.5vw;
 }   
 
 .fruit-image {
-    width: 100cqmin;
-    height: 100cqmin;
+    width: 99cqmin;
+    height: 99cqmin;
     animation:spin 0.5s linear infinite;
+    background-color: transparent;
 }

@@ -63,16 +63,20 @@ fn Pacanele() -> Element {
             id: "pacanele",
 
             div {
-                id: "slot1",
-                SlotImage { pic_name: "orange".to_string() }
-            }
-            div {
-                id: "slot2",
-                SlotImage { pic_name: "orange".to_string() }
-            }
-            div {
-                id: "slot3",
-                SlotImage { pic_name: "orange".to_string() }
+                id: "x777",
+
+                div {
+                    id: "slot1",
+                    SlotImage { pic_name: "orange".to_string() }
+                }
+                div {
+                    id: "slot2",
+                    SlotImage { pic_name: "orange".to_string() }
+                }
+                div {
+                    id: "slot3",
+                    SlotImage { pic_name: "orange".to_string() }
+                }
             }
 
         }
