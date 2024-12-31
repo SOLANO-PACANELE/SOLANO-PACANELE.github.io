@@ -12,6 +12,13 @@
     container-type: size;
 
 }
+
+#777 {
+    width: 99cqmin;
+    height: 33cqmin;
+    container-type: size;
+}
+
 body {
     width: 100vw;
     height: 100vh;
@@ -25,8 +32,8 @@ html, body {
   }
 
 #slot1, #slot2, #slot3 {
-    width: 33cqw;
-    height: 100cqh;
+    width: 33cqmin;
+    height: 100cqmin;
     display: table-cell;
     border: 1px solid black;
     padding: 3px;
@@ -60,8 +67,8 @@ html, body {
     position:absolute;
     bottom: 5vh;
     left: 25vw;
-    height: 35vh;
-    width: 46.5vw;
+    height: 15vh;
+    width: 49.5vw;
 }
 
 #right-box {
