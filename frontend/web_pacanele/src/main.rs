@@ -41,12 +41,12 @@ fn make_animation_string() -> String {
         let z = (rad.cos() - 1.0)*100.0 ;
         let my = -y;
         let mz = -z;
-        /*r
-            transform-origin: 0, {y}cqmin, {z}cqmin; */
         let line_rule = format!(" transform:
              perspective(100cqmin)
               translate3d(0, {y}cqmin, {z}cqmin) 
               rotate3d(1, 0, 0, {deg} ) ;
+
+              z-index: {z},
              ");
         let line_css = format!("{x}% {{ {line_rule} }}");
         css.push_str(&line_css);
@@ -55,6 +55,12 @@ fn make_animation_string() -> String {
     css
 }
 
+const LEGUME : [&'static str; 4] = [
+    "orange",
+    "seven", 
+    "strawberry",
+    "watermelon",
+];
 
 #[component]
 fn Pacanele() -> Element {
@@ -81,15 +87,17 @@ fn Pacanele() -> Element {
 
                 div {
                     id: "slot1",
-                    SlotImage { pic_name: "orange".to_string() }
+                    for (i, fruct) in LEGUME.iter().enumerate() {
+                        SlotImage { pic_name: fruct.to_string(), pic_pos: i as i32 }
+                    }
                 }
                 div {
                     id: "slot2",
-                    SlotImage { pic_name: "orange".to_string() }
+                    SlotImage { pic_name: "orange".to_string() , pic_pos: 0}
                 }
                 div {
                     id: "slot3",
-                    SlotImage { pic_name: "orange".to_string() }
+                    SlotImage { pic_name: "orange".to_string() , pic_pos: 0}
                 }
             }
 
@@ -98,10 +106,16 @@ fn Pacanele() -> Element {
 }
 
 #[component]
-fn SlotImage(pic_name: String) -> Element {
+fn SlotImage(pic_name: String, pic_pos: i32) -> Element {
+    let spin_period = 200.5_f64;
+    let delay = spin_period * pic_pos as f64 / 4.0 ;
     rsx! {
         img {
             class: "fruit-image",
+            style: format!("
+                animation:spin  {spin_period}s linear infinite;
+                animation-delay: -{delay}s;
+            "),
             src: format!("/assets/img2/fruit/{pic_name}.png")
         }
     }
