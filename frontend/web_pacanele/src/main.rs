@@ -35,18 +35,18 @@ fn make_animation_string() -> String {
     css.push_str("@keyframes spin { ");
     const n: i32 = 100;
     for x in 0..=n {
-        let deg = format!("{}deg", 360 * x / n);
+        let deg = format!("{}deg", -360.0 * x as f64 / n as f64);
         let rad = 2. * f64::consts::PI * x as f64 / n as f64;
-        let y = rad.sin() *200.0;
-        let z = (rad.cos() - 2.0)*200.0 ;
+        let y = rad.sin() *100.0;
+        let z = (rad.cos() - 1.0)*100.0 ;
         let my = -y;
         let mz = -z;
-        /*rotate3d(1, 0, 0, {deg} ) ;
+        /*r
             transform-origin: 0, {y}cqmin, {z}cqmin; */
         let line_rule = format!(" transform:
              perspective(100cqmin)
               translate3d(0, {y}cqmin, {z}cqmin) 
-              
+              rotate3d(1, 0, 0, {deg} ) ;
              ");
         let line_css = format!("{x}% {{ {line_rule} }}");
         css.push_str(&line_css);
