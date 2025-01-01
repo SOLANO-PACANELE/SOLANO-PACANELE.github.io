@@ -66,6 +66,12 @@ const LEGUME : [&'static str; 4] = [
 
 #[component]
 fn Pacanele() -> Element {
+    let  mut fruit_list = vec![];
+    for _x in 0..3 {
+        for j in LEGUME {
+            fruit_list.push(j.to_string());
+        }
+    }
     rsx! {
 
         div {
@@ -86,31 +92,34 @@ fn Pacanele() -> Element {
 
             div {
                 id: "x777",
+                SlotWheel { div_id: "slot1".to_string(), fruit_list: fruit_list.clone() }
+                SlotWheel { div_id: "slot2".to_string(), fruit_list: fruit_list.clone() }
+                SlotWheel { div_id: "slot3".to_string(), fruit_list: fruit_list.clone() } 
 
-                div {
-                    id: "slot1",
-                    for (i, fruct) in LEGUME.iter().enumerate() {
-                        SlotImage { pic_name: fruct.to_string(), pic_pos: i as i32 }
-                    }
-                }
-                div {
-                    id: "slot2",
-                    SlotImage { pic_name: "orange".to_string() , pic_pos: 0}
-                }
-                div {
-                    id: "slot3",
-                    SlotImage { pic_name: "orange".to_string() , pic_pos: 0}
-                }
             }
-
         }
     }
 }
 
+
 #[component]
-fn SlotImage(pic_name: String, pic_pos: i32) -> Element {
+fn SlotWheel(fruit_list: Vec<String>, div_id: String) -> Element {
+    rsx! {
+
+    div {
+        id: div_id,
+        for (i, fruct) in fruit_list.iter().enumerate() {
+            SlotImage { pic_name: fruct.to_string(), pic_pos: i as i32, pic_count: fruit_list.len() as i32 }
+        }
+    }
+}
+
+}
+
+#[component]
+fn SlotImage(pic_name: String, pic_pos: i32, pic_count: i32) -> Element {
  
-    let delay = spin_period * pic_pos as f64 / 4.0 ;
+    let delay = spin_period * pic_pos as f64 / pic_count as f64 ;
     rsx! {
         img {
             class: "fruit-image",
