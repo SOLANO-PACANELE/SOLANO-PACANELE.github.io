@@ -64,6 +64,14 @@ const LEGUME : [&'static str; 4] = [
     "watermelon",
 ];
 
+fn shuffle_fruit(v: & Vec<String>) -> Vec<String> {
+    let mut v = v.clone();
+    let mut rng = rand::thread_rng();
+    use rand::prelude::SliceRandom;
+    v.shuffle(&mut rng);
+    v
+}
+
 #[component]
 fn Pacanele() -> Element {
     let  mut fruit_list = vec![];
@@ -92,10 +100,9 @@ fn Pacanele() -> Element {
 
             div {
                 id: "x777",
-                SlotWheel { div_id: "slot1".to_string(), fruit_list: fruit_list.clone() }
-                SlotWheel { div_id: "slot2".to_string(), fruit_list: fruit_list.clone() }
-                SlotWheel { div_id: "slot3".to_string(), fruit_list: fruit_list.clone() } 
-
+                SlotWheel { div_id: "slot1".to_string(), fruit_list: shuffle_fruit(& fruit_list ) }
+                SlotWheel { div_id: "slot2".to_string(), fruit_list: shuffle_fruit(& fruit_list ) }
+                SlotWheel { div_id: "slot3".to_string(), fruit_list: shuffle_fruit(& fruit_list ) } 
             }
         }
     }
