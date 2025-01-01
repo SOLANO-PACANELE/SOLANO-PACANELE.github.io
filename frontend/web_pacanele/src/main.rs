@@ -3,6 +3,8 @@ use core::f64;
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{Level, info};
 
+const spin_period: f64 = 50.5_f64;
+
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
 enum Route {
@@ -46,7 +48,7 @@ fn make_animation_string() -> String {
               translate3d(0, {y}cqmin, {z}cqmin) 
               rotate3d(1, 0, 0, {deg} ) ;
 
-              z-index: {z},
+              z-index: {z};
              ");
         let line_css = format!("{x}% {{ {line_rule} }}");
         css.push_str(&line_css);
@@ -107,7 +109,7 @@ fn Pacanele() -> Element {
 
 #[component]
 fn SlotImage(pic_name: String, pic_pos: i32) -> Element {
-    let spin_period = 200.5_f64;
+ 
     let delay = spin_period * pic_pos as f64 / 4.0 ;
     rsx! {
         img {
