@@ -86,6 +86,6 @@ html, body {
 .fruit-image {
     width: 99cqmin;
     height: 99cqmin;
-    animation:spin 0.5s linear infinite;
+    animation:spin 2.5s linear infinite;
     background-color: transparent;
 }
