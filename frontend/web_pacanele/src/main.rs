@@ -33,18 +33,20 @@ fn App() -> Element {
 fn make_animation_string() -> String {
     let mut css = "".to_string();
     css.push_str("@keyframes spin { ");
-    for x in 0..=100 {
-        let deg = format!("{}deg", 360 * x / 100);
-        let rad = 2. * f64::consts::PI / 100.0;
-        let y = rad.sin() *100.0;
-        let z = (rad.cos() - 1.0)*100.0 ;
+    const n: i32 = 100;
+    for x in 0..=n {
+        let deg = format!("{}deg", 360 * x / n);
+        let rad = 2. * f64::consts::PI * x as f64 / n as f64;
+        let y = rad.sin() *200.0;
+        let z = (rad.cos() - 2.0)*200.0 ;
         let my = -y;
         let mz = -z;
+        /*rotate3d(1, 0, 0, {deg} ) ;
+            transform-origin: 0, {y}cqmin, {z}cqmin; */
         let line_rule = format!(" transform:
              perspective(100cqmin)
               translate3d(0, {y}cqmin, {z}cqmin) 
-              rotate3d(1, 0, 0, {deg} ) ;
-            transform-origin: 0, {y}cqmin, {z}cqmin;
+              
              ");
         let line_css = format!("{x}% {{ {line_rule} }}");
         css.push_str(&line_css);
