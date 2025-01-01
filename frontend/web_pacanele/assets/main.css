@@ -89,4 +89,16 @@ html, body {
     
     background-color: transparent;
     position:absolute;
+    top: 0xp;
+    left: -25cqmin;
+}
+
+.pavaravan {
+    width: 100cqw;
+    height: 100cqh;
+    position: absolute;
+    top: 0px;
+    left: 0px; 
+    background-color: rgba(255,255,255,128);
+    z-index: -200;
 }

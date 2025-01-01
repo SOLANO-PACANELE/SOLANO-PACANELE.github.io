@@ -26,13 +26,13 @@ fn App() -> Element {
         document::Link { rel: "icon", href: FAVICON }
         document::Link { rel: "stylesheet", href: MAIN_CSS }
         document::Style {
-            {make_animation_string()}
+            {make_animation_string(12)}
         }
         Router::<Route> {}
     }
 }
 
-fn make_animation_string() -> String {
+fn make_animation_string(pic_count: i32) -> String {
     let mut css = "".to_string();
     css.push_str("@keyframes spin { ");
     const n: i32 = 100;
@@ -40,15 +40,17 @@ fn make_animation_string() -> String {
         let deg = format!("{}deg", -360.0 * x as f64 / n as f64);
         let rad = 2. * f64::consts::PI * x as f64 / n as f64;
         let y = rad.sin() *100.0;
-        let z = (rad.cos() - 1.0)*100.0 ;
+        let z = (rad.cos() - 2.0)*100.0 ;
         let my = -y;
         let mz = -z;
+        let scale = 2.0 * f64::consts::PI / pic_count as f64 * 1.05;
         let line_rule = format!(" transform:
              perspective(100cqmin)
-              translate3d(0, {y}cqmin, {z}cqmin) 
-              rotate3d(1, 0, 0, {deg} ) ;
+              translate3d(-5cqmin, {y}cqmin, {z}cqmin) 
+              rotate3d(1, 0, 0, {deg} ) scale3d({scale},{scale},{scale});
 
               z-index: {z};
+
              ");
         let line_css = format!("{x}% {{ {line_rule} }}");
         css.push_str(&line_css);
@@ -100,6 +102,7 @@ fn Pacanele() -> Element {
 
             div {
                 id: "x777",
+
                 SlotWheel { div_id: "slot1".to_string(), fruit_list: shuffle_fruit(& fruit_list ) }
                 SlotWheel { div_id: "slot2".to_string(), fruit_list: shuffle_fruit(& fruit_list ) }
                 SlotWheel { div_id: "slot3".to_string(), fruit_list: shuffle_fruit(& fruit_list ) } 
@@ -115,6 +118,10 @@ fn SlotWheel(fruit_list: Vec<String>, div_id: String) -> Element {
 
     div {
         id: div_id,
+        div {
+            class:"pavaravan"
+        }
+        
         for (i, fruct) in fruit_list.iter().enumerate() {
             SlotImage { pic_name: fruct.to_string(), pic_pos: i as i32, pic_count: fruit_list.len() as i32 }
         }
