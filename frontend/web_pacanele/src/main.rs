@@ -1,3 +1,5 @@
+use core::f64;
+
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{Level, info};
 
@@ -32,8 +34,11 @@ fn make_animation_string() -> String {
     let mut css = "".to_string();
     css.push_str("@keyframes spin { ");
     for x in 0..=100 {
-        let rot = format!("{}deg", 360 * x / 100);
-        let line_rule = format!(" transform: rotate3d(1, 0, 0, {rot} ) ; ");
+        let deg = format!("{}deg", 360 * x / 100);
+        let rad = 2. * f64::consts::PI / 100.0;
+        let y = rad.sin() ;
+        let z = rad.cos() + 2.0 ;
+        let line_rule = format!(" transform: perspective(1cqmin) translate3d(0, {y}cqmin, {z}cqmin) rotate3d(1, 0, 0, {deg} ) ; ");
         let line_css = format!("{x}% {{ {line_rule} }}");
         css.push_str(&line_css);
     }
