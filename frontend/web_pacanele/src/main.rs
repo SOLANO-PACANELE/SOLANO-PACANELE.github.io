@@ -50,12 +50,12 @@ fn make_animation_string(pic_count: i32) -> String {
 fn make_transform_string(rad: f64, pic_count: i32) -> String {
     let size_coef = 2.9;
     let y = rad.sin() *size_coef * 100.0;
-    let z = (rad.cos() - 2.0)*size_coef * 100.0;
+    let z = (rad.cos() - 1.5)*size_coef * 100.0;
     let z_index =  ((rad.cos() - 2.0) * 100.0).round() as i32;
     let scale = 2.0 * f64::consts::PI / pic_count as f64 * 1.05 * size_coef;
-    info!("transform c={pic_count}   scale={scale}");
+    // info!("transform c={pic_count}   scale={scale}");
     format!(" transform:
-    perspective(3700cqmin)
+    perspective(555cqmin)
      translate3d(0cqmin, {y}cqmin, {z}cqmin) 
      rotate3d(1, 0, 0, {rad}rad) scale3d({scale},{scale},{scale});
 
@@ -101,9 +101,9 @@ fn Pacanele() -> Element {
             div {
                 id: "x777",
 
-                SlotWheel { div_id: "slot1".to_string(), fruit_list: shuffle_fruit(& fruit_list) , spin_period: 5.0 }
-                SlotWheel { div_id: "slot2".to_string(), fruit_list: shuffle_fruit(& fruit_list) , spin_period: 6.0 }
-                SlotWheel { div_id: "slot3".to_string(), fruit_list: shuffle_fruit(& fruit_list) , spin_period: 8.0 } 
+                SlotWheel { div_id: "slot1".to_string(), fruit_list: shuffle_fruit(& fruit_list) , spin_period: 3.0 }
+                SlotWheel { div_id: "slot2".to_string(), fruit_list: shuffle_fruit(& fruit_list) , spin_period: 4.0 }
+                SlotWheel { div_id: "slot3".to_string(), fruit_list: shuffle_fruit(& fruit_list) , spin_period: 5.0 } 
             }
         }
     }
