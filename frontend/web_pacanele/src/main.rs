@@ -3,7 +3,6 @@ use core::f64;
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{Level, info};
 
-const spin_period: f64 = 50.5_f64;
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
@@ -26,7 +25,7 @@ fn App() -> Element {
         document::Link { rel: "icon", href: FAVICON }
         document::Link { rel: "stylesheet", href: MAIN_CSS }
         document::Style {
-            {make_animation_string(12)}
+            {make_animation_string(get_all_fruits().len() as i32)}
         }
         Router::<Route> {}
     }
@@ -35,36 +34,40 @@ fn App() -> Element {
 fn make_animation_string(pic_count: i32) -> String {
     let mut css = "".to_string();
     css.push_str("@keyframes spin { ");
-    const n: i32 = 100;
-    for x in 0..=n {
-        let deg = format!("{}deg", -360.0 * x as f64 / n as f64);
-        let rad = 2. * f64::consts::PI * x as f64 / n as f64;
-        let y = rad.sin() *100.0;
-        let z = (rad.cos() - 2.0)*100.0 ;
-        let my = -y;
-        let mz = -z;
-        let scale = 2.0 * f64::consts::PI / pic_count as f64 * 1.05;
-        let line_rule = format!(" transform:
-             perspective(100cqmin)
-              translate3d(-5cqmin, {y}cqmin, {z}cqmin) 
-              rotate3d(1, 0, 0, {deg} ) scale3d({scale},{scale},{scale});
+    const num_keyframes: i32 = 25;
+    for index in 0..=num_keyframes {
 
-              z-index: {z};
-
-             ");
-        let line_css = format!("{x}% {{ {line_rule} }}");
+        let rad = 2. * f64::consts::PI * index as f64 / num_keyframes as f64;
+        let percent = index as f64 / num_keyframes as f64 * 100.0;
+        let line_rule = make_transform_string(rad, pic_count);
+        let line_css = format!("{percent}% {{ {line_rule} }}");
         css.push_str(&line_css);
     }
     css.push_str("}");
     css
 }
 
-const LEGUME : [&'static str; 4] = [
-    "orange",
-    "seven", 
-    "strawberry",
-    "watermelon",
-];
+fn make_transform_string(rad: f64, pic_count: i32) -> String {
+    let size_coef = 2.9;
+    let y = rad.sin() *size_coef * 100.0;
+    let z = (rad.cos() - 2.0)*size_coef * 100.0;
+    let z_index =  ((rad.cos() - 2.0) * 100.0).round() as i32;
+    let scale = 2.0 * f64::consts::PI / pic_count as f64 * 1.05 * size_coef;
+    info!("transform c={pic_count}   scale={scale}");
+    format!(" transform:
+    perspective(3700cqmin)
+     translate3d(0cqmin, {y}cqmin, {z}cqmin) 
+     rotate3d(1, 0, 0, {rad}rad) scale3d({scale},{scale},{scale});
+
+     z-index: {z_index};
+    ")
+}
+
+fn get_all_fruits() -> Vec<String> {
+   include_str!("./fruits.txt").split_whitespace().map(|s| s.trim().split(".").next().unwrap().to_string()).collect()
+
+}
+
 
 fn shuffle_fruit(v: & Vec<String>) -> Vec<String> {
     let mut v = v.clone();
@@ -76,12 +79,7 @@ fn shuffle_fruit(v: & Vec<String>) -> Vec<String> {
 
 #[component]
 fn Pacanele() -> Element {
-    let  mut fruit_list = vec![];
-    for _x in 0..3 {
-        for j in LEGUME {
-            fruit_list.push(j.to_string());
-        }
-    }
+    let fruit_list = get_all_fruits();
     rsx! {
 
         div {
@@ -103,9 +101,9 @@ fn Pacanele() -> Element {
             div {
                 id: "x777",
 
-                SlotWheel { div_id: "slot1".to_string(), fruit_list: shuffle_fruit(& fruit_list ) }
-                SlotWheel { div_id: "slot2".to_string(), fruit_list: shuffle_fruit(& fruit_list ) }
-                SlotWheel { div_id: "slot3".to_string(), fruit_list: shuffle_fruit(& fruit_list ) } 
+                SlotWheel { div_id: "slot1".to_string(), fruit_list: shuffle_fruit(& fruit_list) , spin_period: 5.0 }
+                SlotWheel { div_id: "slot2".to_string(), fruit_list: shuffle_fruit(& fruit_list) , spin_period: 6.0 }
+                SlotWheel { div_id: "slot3".to_string(), fruit_list: shuffle_fruit(& fruit_list) , spin_period: 8.0 } 
             }
         }
     }
@@ -113,7 +111,7 @@ fn Pacanele() -> Element {
 
 
 #[component]
-fn SlotWheel(fruit_list: Vec<String>, div_id: String) -> Element {
+fn SlotWheel(fruit_list: Vec<String>, div_id: String, spin_period: f64) -> Element {
     rsx! {
 
     div {
@@ -121,9 +119,9 @@ fn SlotWheel(fruit_list: Vec<String>, div_id: String) -> Element {
         div {
             class:"pavaravan"
         }
-        
+
         for (i, fruct) in fruit_list.iter().enumerate() {
-            SlotImage { pic_name: fruct.to_string(), pic_pos: i as i32, pic_count: fruit_list.len() as i32 }
+            SlotImage { pic_name: fruct.to_string(), pic_pos: i as i32, pic_count: fruit_list.len() as i32 , spin_period}
         }
     }
 }
@@ -131,15 +129,18 @@ fn SlotWheel(fruit_list: Vec<String>, div_id: String) -> Element {
 }
 
 #[component]
-fn SlotImage(pic_name: String, pic_pos: i32, pic_count: i32) -> Element {
- 
+fn SlotImage(pic_name: String, pic_pos: i32, pic_count: i32, spin_period: f64) -> Element {
+    let spin_count = 1.0 + pic_pos as f64 / pic_count as f64 ;
     let delay = spin_period * pic_pos as f64 / pic_count as f64 ;
+
+    let rad = 2. * f64::consts::PI * pic_pos as f64 / pic_count as f64;
+    let final_transform = make_transform_string(rad, pic_count);
     rsx! {
         img {
             class: "fruit-image",
             style: format!("
-                animation:spin  {spin_period}s linear infinite;
-                animation-delay: -{delay}s;
+                animation:  {spin_period}s linear {spin_count} -{delay}s spin ;
+                {final_transform}
             "),
             src: format!("/assets/img2/fruit/{pic_name}.png")
         }

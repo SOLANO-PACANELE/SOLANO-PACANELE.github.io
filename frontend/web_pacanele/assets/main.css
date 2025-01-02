@@ -1,6 +1,7 @@
 body,div {
     border: 0px;
     margin: 0px;
+    z-index: 0;
 }
 
 #pacanele {
@@ -14,15 +15,23 @@ body,div {
     top: 25vh;
     border: 1px solid red;
     container-type: size;
+    z-index: 0;
 
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
 }
 
 #x777 {
-    width: 297cqmin;
-    height: 99cqmin;
+    width: calc(min(100cqmax, 300cqmin));
+    height: calc(min(33cqmax, 100cqmin));
+    margin:auto;
+
     container-type: size;
-    margin: auto;
     border: 1px solid yellow;
+    z-index: 0;
+    overflow: hidden;
 }
 
 body {
@@ -30,21 +39,24 @@ body {
     height: 100vh;
     border: 0px;
     margin: 0px;
+    z-index: 0;
 }
 html, body {
     height: 100%;
     -webkit-perspective: 600;
     perspective: 600;
+    z-index: 0;
   }
 
 #slot1, #slot2, #slot3 {
-    width: 33cqmin;
-    height: 99cqmin;
+    width: 100cqmin;
+    height: 100cqmin;
     display: table-cell;
     border: 1px solid black;
     padding: 0px;
     margin : 0px;
     container-type: size;
+    overflow: hidden;
 }
 
 #top-box {
@@ -84,21 +96,21 @@ html, body {
 }   
 
 .fruit-image {
-    width: 99cqmin;
-    height: 99cqmin;
+    width: 100cqmin;
+    height: 100cqmin;
     
     background-color: transparent;
     position:absolute;
-    top: 0xp;
-    left: -25cqmin;
+    top: 0px;
+    left: 0px;
 }
 
 .pavaravan {
-    width: 100cqw;
-    height: 100cqh;
+    width: 100cqmin;
+    height: 100cqmin;
     position: absolute;
     top: 0px;
     left: 0px; 
-    background-color: rgba(255,255,255,128);
+    background-color: rgba(255, 255, 255, 0.938);
     z-index: -200;
 }
