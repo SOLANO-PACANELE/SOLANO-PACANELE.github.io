@@ -2,6 +2,7 @@ use core::f64;
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{Level, info};
+use svg_attributes::fr;
 
 
 #[derive(Debug, Clone, Routable, PartialEq)]
@@ -80,6 +81,26 @@ fn shuffle_fruit(v: & Vec<String>) -> Vec<String> {
 #[component]
 fn Pacanele() -> Element {
     let fruit_list = get_all_fruits();
+    let fruit_count = fruit_list.len() as u64;
+    let rand_pos = move || {
+        let mut rng = rand::thread_rng();
+        use rand::Rng;
+        rng.gen::<u64>() % fruit_count
+    };
+    let mut positions = use_signal(|| (0,0,0));
+    let mut fetch_new_positions = move || {
+        let old_pos = *positions.peek();
+        let new_pos = (rand_pos(), rand_pos(), rand_pos());
+        positions.set(new_pos);
+        (old_pos, new_pos)
+    };
+
+    let mut spin_sequence = use_signal(|| ((0,0,0), (0,0,0)));
+
+    let mut do_spin = move || {
+        spin_sequence.set(fetch_new_positions());
+    };
+
     rsx! {
 
         div {
@@ -92,7 +113,15 @@ fn Pacanele() -> Element {
             id: "bottom-box"
         }
         div {
-            id: "right-box"
+            id: "right-box",
+            button {
+                onclick: move |_ev| {
+                    do_spin();
+                },
+                h1 {
+                    "Spin"
+                }
+            }
         }
 
         div {
@@ -101,17 +130,18 @@ fn Pacanele() -> Element {
             div {
                 id: "x777",
 
-                SlotWheel { div_id: "slot1".to_string(), fruit_list: shuffle_fruit(& fruit_list) , spin_period: 3.0 }
-                SlotWheel { div_id: "slot2".to_string(), fruit_list: shuffle_fruit(& fruit_list) , spin_period: 4.0 }
-                SlotWheel { div_id: "slot3".to_string(), fruit_list: shuffle_fruit(& fruit_list) , spin_period: 5.0 } 
+                SlotWheel { div_id: "slot1".to_string(), fruit_list: fruit_list.clone() , spin_period: 3.0, spin_from: spin_sequence.read().0.0, spin_to: spin_sequence.read().1.0 }
+                SlotWheel { div_id: "slot2".to_string(), fruit_list:  fruit_list.clone(), spin_period: 4.0, spin_from: spin_sequence.read().0.0, spin_to: spin_sequence.read().1.0 }
+                SlotWheel { div_id: "slot3".to_string(), fruit_list: fruit_list.clone(), spin_period: 5.0, spin_from: spin_sequence.read().0.0, spin_to: spin_sequence.read().1.0 } 
             }
         }
+
     }
 }
 
 
 #[component]
-fn SlotWheel(fruit_list: Vec<String>, div_id: String, spin_period: f64) -> Element {
+fn SlotWheel(fruit_list: Vec<String>, div_id: String, spin_period: f64, spin_from: u64, spin_to: u64) -> Element {
     rsx! {
 
     div {
