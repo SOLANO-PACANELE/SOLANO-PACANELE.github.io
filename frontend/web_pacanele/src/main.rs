@@ -146,13 +146,19 @@ fn SlotWheel(fruit_list: Vec<String>, div_id: String, spin_period: f64, spin_fro
 
     div {
         id: div_id,
+        class: "slot-box",
+
         div {
-            class:"pavaravan"
+            class: "slot-display",
+            div {
+                class:"pavaravan"
+            }
+    
+            for (i, fruct) in fruit_list.iter().enumerate() {
+                SlotImage { pic_name: fruct.to_string(), pic_pos: i as i32, pic_count: fruit_list.len() as i32 , spin_period}
+            }
         }
 
-        for (i, fruct) in fruit_list.iter().enumerate() {
-            SlotImage { pic_name: fruct.to_string(), pic_pos: i as i32, pic_count: fruit_list.len() as i32 , spin_period}
-        }
     }
 }
 
