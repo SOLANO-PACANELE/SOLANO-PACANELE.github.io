@@ -24,8 +24,8 @@ body,div {
 }
 
 #x777 {
-    width: calc(min(100cqmax, 300cqmin));
-    height: calc(min(33cqmax, 100cqmin));
+    width: calc(min(100cqw, 300cqh));
+    height: calc(min(33cqw, 100cqh));
     margin:auto;
 
     container-type: size;
