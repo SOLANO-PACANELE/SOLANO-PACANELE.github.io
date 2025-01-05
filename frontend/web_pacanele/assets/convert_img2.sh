@@ -24,6 +24,11 @@ for x in img0/*/*.png; do
     magick convert $t2.*.png -average  $t2
     rm -f $t2.*.png
 
+    magick convert $t2 -alpha extract -blur 0x8 +dither -colors 3 -colors 2  -colorspace gray -normalize -blur 0x2 -morphology Erode:2 Diamond  $t2.alpha.png
+    magick $t2 $t2.alpha.png -compose CopyOpacity -composite $t2.fin.png
+    mv $t2.fin.png $t2
+    rm -f $t2.alpha.png
+
 done
 wait
 
