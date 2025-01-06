@@ -11,6 +11,7 @@ pub async fn get_wheel_results(pcnl_count: u32) -> Result<Vec<String>, ServerFnE
     for _i in 0..pcnl_count {
         res.push(srv_get_random_pcnl().await);
     }
+    _wait_random(1.5, 6.5).await;
 
     Ok(res)
 }

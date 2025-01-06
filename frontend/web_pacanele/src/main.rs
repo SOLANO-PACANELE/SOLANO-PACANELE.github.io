@@ -104,7 +104,7 @@ fn Pacanele() -> Element {
         div { id: "pacanele",
             div { id: "x777",
                 SlotWheelRow { pcnl_state, shuf_state, pcnl_count }
-            
+
             }
         }
     }
@@ -167,71 +167,33 @@ fn SpinButton(
         assert!(new_results.len() == state.wheels.len());
         send_audio_event(AudioEvent::HaveResults);
 
-        let mut _fut = vec![];
-
         // now that we have the results, we can diverge into each wheel
-        for (pcnl_id, (new_fruit, (mut wheel, w_shuf))) in new_results
-            .into_iter()
-            .zip(
-                state
-                    .wheels
-                    .iter()
-                    .cloned()
-                    .zip(_shuf.wheels.iter().cloned()),
-            )
-            .enumerate()
-        {
+        let mut _fut = vec![];
+        for seq in compute_wheel_sequences(&state, &_shuf, new_results, spin_time) {
             _fut.push(spawn(async move {
-                // wait until whole number of spins passes
-                let spin_period = wheel.spin_period;
-                let elapsed = get_current_ts() - spin_time;
-                let elapsed_periods = elapsed / spin_period;
-                let remaining_period = 1.0 - elapsed_periods.fract();
-                let remaining_secs = remaining_period * spin_period;
-                sleep(remaining_secs).await;
-
-                // update the results after whole number of spins
-                wheel.spin_count += 1;
-                wheel.old_fruit = wheel.new_fruit.clone();
-                wheel.new_fruit = new_fruit;
-                wheel.old_idx = w_shuf.idx[&wheel.old_fruit];
-                wheel.new_idx = w_shuf.idx[&wheel.new_fruit];
-                wheel.wheel_stage = WheelStage::HaveResults;
-
-                let pic_count = w_shuf.shuffle.len() as u32;
-                let slot_diff = (pic_count - wheel.new_idx + wheel.old_idx) % pic_count;
-                let slot_diff = if slot_diff == 0 { pic_count } else { slot_diff };
-                let rotations_diff = slot_diff as f64 / pic_count as f64;
-
-                wheel.rotations_diff = rotations_diff;
-
-                {
-                    if let Some(x) = pcnl_state.write().as_mut() {
-                        x.wheels[pcnl_id as usize] = wheel;
-                    }
+                sleep(seq.first_wait).await;
+                if let Some(x) = pcnl_state.write().as_mut() {
+                    x.wheels[seq.pcnl_id as usize] = seq.first_val;
                 }
-
-                // wait until last part of spin finishes, then set ready
-                sleep(rotations_diff * spin_period).await;
-                {
-                    if let Some(x) = pcnl_state.write().as_mut() {
-                        x.wheels[pcnl_id as usize].wheel_stage = WheelStage::Ready;
-                    }
+                sleep(seq.second_wait).await;
+                if let Some(x) = pcnl_state.write().as_mut() {
+                    x.wheels[seq.pcnl_id as usize] = seq.second_val;
                 }
-
                 send_audio_event(AudioEvent::WheelStop {
-                    wheel_id: pcnl_id as u32,
+                    wheel_id: seq.pcnl_id,
+                    pcnl_count
                 });
             }));
         }
+
         // wait until all pcnl is ready, then send audio stop events
         spawn(async move {
             while !*wheels_ready.peek() {
                 sleep(0.1).await;
             }
-            sleep(0.5).await;
+            sleep(0.4).await;
             send_audio_event(AudioEvent::WheelsFinished);
-            sleep(0.5).await;
+            sleep(0.1).await;
             send_audio_event(AudioEvent::StopAudio);
             sleep(0.1).await;
             effects_running.set(false);
@@ -259,6 +221,78 @@ fn SpinButton(
             }
         }
     }
+}
+
+struct WheelSequenceInfo {
+    pcnl_id: u32,
+    first_wait: f64,
+    first_val: PcnlWheelState,
+    second_wait: f64,
+    second_val: PcnlWheelState,
+}
+
+fn compute_wheel_sequences(
+    state: &PcnlState,
+    shuf: &ShuffleState,
+    new_results: Vec<String>,
+    spin_time: f64,
+) -> Vec<WheelSequenceInfo> {
+    let mut v: Vec<WheelSequenceInfo> = new_results
+        .into_iter()
+        .zip(state.wheels.iter().zip(shuf.wheels.iter().cloned()))
+        .enumerate()
+        .map(|(pcnl_id, (new_fruit, (wheel, w_shuf)))| {
+            let mut wheel = wheel.clone();
+            let pcnl_id = pcnl_id as u32;
+
+            // wait until whole number of spins passes
+            let spin_period = wheel.spin_period;
+            let elapsed = get_current_ts() - spin_time;
+            let elapsed_periods = elapsed / spin_period;
+            let remaining_period = 1.0 - elapsed_periods.fract();
+            let remaining_secs = remaining_period * spin_period;
+            let first_wait = remaining_secs;
+
+            // update the results after whole number of spins
+            wheel.spin_count += 1;
+            wheel.old_fruit = wheel.new_fruit.clone();
+            wheel.new_fruit = new_fruit;
+            wheel.old_idx = w_shuf.idx[&wheel.old_fruit];
+            wheel.new_idx = w_shuf.idx[&wheel.new_fruit];
+            wheel.wheel_stage = WheelStage::HaveResults;
+
+            let pic_count = w_shuf.shuffle.len() as u32;
+            let slot_diff = (pic_count - wheel.new_idx + wheel.old_idx) % pic_count;
+            let slot_diff = if slot_diff == 0 { pic_count } else { slot_diff };
+            let rotations_diff = slot_diff as f64 / pic_count as f64;
+
+            wheel.rotations_diff = rotations_diff;
+
+            let first_val = wheel.clone();
+
+            // wait until last part of spin finishes, then set ready
+            let second_wait = rotations_diff * spin_period;
+            wheel.wheel_stage = WheelStage::Ready;
+            let second_val = wheel;
+
+            WheelSequenceInfo {
+                first_val,
+                first_wait,
+                second_val,
+                second_wait,
+                pcnl_id,
+            }
+        })
+        .collect();
+
+    // wheels stop left to right, staggered at least 0.1s
+    for pcnl_id in 1..state.wheels.len() {
+        let duration_prev = v[pcnl_id-1].first_wait + v[pcnl_id-1].second_wait;
+        while v[pcnl_id].first_wait + v[pcnl_id].second_wait < 0.2 + duration_prev {
+            v[pcnl_id].first_wait += v[pcnl_id].first_val.spin_period;
+        }
+    }
+    v
 }
 
 #[component]

@@ -11,7 +11,7 @@ use crate::{
 pub enum AudioEvent {
     StartSpin,
     HaveResults,
-    WheelStop { wheel_id: u32 },
+    WheelStop { wheel_id: u32, pcnl_count: u32 },
     WheelsFinished,
     StopAudio,
 }

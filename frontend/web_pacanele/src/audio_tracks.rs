@@ -43,14 +43,20 @@ fn sound_track_1(info: SoundSequenceInfo, prev: SoundTrackOutput) -> SoundTrackO
     let arp = match info.last_event {
         AudioEvent::StartSpin => vec![0, 4, 7],
         AudioEvent::HaveResults => vec![0, 4, 7, 11],
-        AudioEvent::WheelStop { .. } => vec![4, 7, 11],
+        AudioEvent::WheelStop { .. } => vec![4, 7, 11, 12],
         _ => vec![0],
     };
 
     let gain = match info.last_event {
         AudioEvent::StartSpin => 0.2 + 0.2 * (info.time_since_event.clamp(0.0, 2.0) / 2.0),
         AudioEvent::HaveResults => 0.4 + 0.2 * (info.time_since_event.clamp(0.0, 2.0) / 2.0),
-        AudioEvent::WheelStop { .. } => 0.6 + 0.1 * (info.time_since_event.clamp(0.0, 2.0) / 2.0),
+        AudioEvent::WheelStop { wheel_id, pcnl_count } => {
+            if wheel_id == pcnl_count - 1 {
+                0.0
+            } else {
+                0.6 + 0.1 * (info.time_since_event.clamp(0.0, 2.0) / 2.0)
+            }
+        },
         _ => 0.0,
     } as f32;
 
@@ -81,7 +87,7 @@ fn sound_track_2(info: SoundSequenceInfo, _prev: SoundTrackOutput) -> SoundTrack
     } as f32;
 
     let note = match info.last_event {
-        AudioEvent::WheelStop { wheel_id } => 72 + wheel_id as u8,
+        AudioEvent::WheelStop { wheel_id, .. } => 72 + wheel_id as u8,
         _ => 0,
     };
 
