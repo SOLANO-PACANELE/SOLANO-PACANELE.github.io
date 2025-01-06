@@ -2,15 +2,18 @@ use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
 use web_sys::{wasm_bindgen::JsValue, AudioContext, OscillatorType};
 
-use crate::{audio_tracks::{SoundSequenceInfo, SoundTrackOutput, TRACKS}, time::{get_current_ts, sleep}};
+use crate::{
+    audio_tracks::{SoundSequenceInfo, SoundTrackOutput, TRACKS},
+    time::{get_current_ts, sleep},
+};
 
 #[derive(Debug, Clone, Copy)]
 pub enum AudioEvent {
     StartSpin,
     HaveResults,
-    WheelStop{wheel_id: u32},
+    WheelStop { wheel_id: u32 },
     WheelsFinished,
-    StopAudio
+    StopAudio,
 }
 
 pub fn make_audio_loop_coroutine() {
@@ -19,8 +22,8 @@ pub fn make_audio_loop_coroutine() {
         let mut last_event = None;
         let mut last_event_time = get_current_ts();
         let mut ding_id = 0;
-        
-        let mut last_outputs = vec![SoundTrackOutput::default() ; TRACKS.len()];
+
+        let mut last_outputs = vec![SoundTrackOutput::default(); TRACKS.len()];
         loop {
             ding_id += 1;
             if let Ok(Some(event)) = _rx.try_next() {
@@ -30,21 +33,24 @@ pub fn make_audio_loop_coroutine() {
                 match event {
                     AudioEvent::StartSpin => {
                         oscillators.set(Some(OscillatorList::new(TRACKS.len() as u8)));
-                    },
+                    }
                     AudioEvent::StopAudio => {
                         oscillators.set(None);
-                    },
+                    }
                     _ => {}
                 }
             }
 
-            if let (Some(fms), Some(last_event)) = ( oscillators.write().as_mut(), last_event) {
-
+            if let (Some(fms), Some(last_event)) = (oscillators.write().as_mut(), last_event) {
                 let sequence_info = SoundSequenceInfo {
-                    last_event, ding_id, time_since_event: (get_current_ts() - last_event_time).max(0.0001),
+                    last_event,
+                    ding_id,
+                    time_since_event: (get_current_ts() - last_event_time).max(0.0001),
                 };
 
-                for ((_fn, _last_output), _fm) in (TRACKS.iter().zip(last_outputs.iter_mut())).zip(fms.v.iter_mut()) {
+                for ((_fn, _last_output), _fm) in
+                    (TRACKS.iter().zip(last_outputs.iter_mut())).zip(fms.v.iter_mut())
+                {
                     *_last_output = _fn(sequence_info, *_last_output);
                     _fm.set_gain(_last_output.gain);
                     _fm.set_note(_last_output.note);
@@ -60,28 +66,27 @@ pub fn make_audio_loop_coroutine() {
     });
     let tx: UnboundedSender<AudioEvent> = co.tx();
 
-    use_context_provider( move || tx);     
+    use_context_provider(move || tx);
 }
 
 pub fn send_audio_event(ev: AudioEvent) {
     let tx = use_context::<UnboundedSender<AudioEvent>>();
-    if let Err(e) = tx.unbounded_send(ev) 
-    {
+    if let Err(e) = tx.unbounded_send(ev) {
         info!("audio event send error: {e}");
     } else {
         info!("sent audio event: {ev:?}");
     }
 }
 
-
 struct OscillatorList {
     v: Vec<FmOsc>,
-} 
+}
 impl OscillatorList {
-    fn new(osc_count: u8) ->  Self {
+    fn new(osc_count: u8) -> Self {
         assert!(osc_count < 10 && osc_count > 0);
         let mut v = vec![];
-        for _x in 0..osc_count {        let mut fm = FmOsc::new().unwrap();
+        for _x in 0..osc_count {
+            let mut fm = FmOsc::new().unwrap();
             fm.set_note(60);
             fm.set_fm_frequency(0.0);
             fm.set_fm_amount(0.0);
@@ -89,7 +94,7 @@ impl OscillatorList {
             v.push(fm);
         }
 
-        Self {v}
+        Self { v }
     }
 }
 

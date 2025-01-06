@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
 use web_pacanele::{
-    audio::{send_audio_event, AudioEvent, make_audio_loop_coroutine},
+    audio::{make_audio_loop_coroutine, send_audio_event, AudioEvent},
     fruit_list::get_all_fruits,
     gen_css::{make_animation_string, make_transform_string},
     random::{get_wheel_results, get_wheel_shuffle},
@@ -227,8 +227,10 @@ fn SpinButton(
                         x.wheels[pcnl_id as usize].wheel_stage = WheelStage::Ready;
                     }
                 }
-                
-                send_audio_event(AudioEvent::WheelStop { wheel_id: pcnl_id as u32 });
+
+                send_audio_event(AudioEvent::WheelStop {
+                    wheel_id: pcnl_id as u32,
+                });
             }));
         }
         // wait until all pcnl is ready, then send audio stop events
@@ -243,8 +245,6 @@ fn SpinButton(
             sleep(0.1).await;
             effects_running.set(false);
         });
-
-
     };
 
     rsx! {
