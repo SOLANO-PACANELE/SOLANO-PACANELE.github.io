@@ -1,4 +1,4 @@
-use dioxus_logger::tracing::info;
+// use dioxus_logger::tracing::info;
 
 pub fn get_current_ts() -> f64 {
     web_time::SystemTime::now()

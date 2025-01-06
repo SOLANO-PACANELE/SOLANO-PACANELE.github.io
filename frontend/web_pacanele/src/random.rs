@@ -1,8 +1,6 @@
 use core::f64;
-use std::collections::HashMap;
 
 use dioxus::prelude::*;
-use dioxus_logger::tracing::{info, Level};
 use rand::thread_rng;
 
 #[server]
@@ -14,14 +12,11 @@ pub async fn get_wheel_results(pcnl_count: u32) -> Result<Vec<String>, ServerFnE
         res.push(srv_get_random_pcnl().await);
     }
 
-    // simulate solana tranzaction delay
-    // wait_random(0.6, 5.5).await;
-
     Ok(res)
 }
 
 #[cfg(feature = "server")]
-async fn wait_random(min_s: f64, max_s: f64) {
+async fn _wait_random(min_s: f64, max_s: f64) {
     use tokio::task::spawn_blocking;
     tokio::time::sleep(
         spawn_blocking(move || {
