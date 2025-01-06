@@ -96,24 +96,15 @@ fn Pacanele() -> Element {
             DebugSpinResult { pcnl_state }
         }
         div { id: "left-box" }
-        div { id: "bottom-box",
-        }
+        div { id: "bottom-box" }
         div { id: "right-box",
-            SpinButton {
-                pcnl_state,
-                shuf_state,
-                pcnl_count,
-            }
+            SpinButton { pcnl_state, shuf_state, pcnl_count }
         }
 
         div { id: "pacanele",
             div { id: "x777",
-                SlotWheelRow {
-                    pcnl_state,
-                    shuf_state,
-                    pcnl_count,
-                }
-
+                SlotWheelRow { pcnl_state, shuf_state, pcnl_count }
+            
             }
         }
     }
@@ -279,11 +270,7 @@ fn SlotWheelRow(
     info!("SlotWheelRow()");
     rsx! {
         for i in 0..pcnl_count {
-            SlotWheelX {
-                pcnl_id: i,
-                pcnl_state,
-                shuf_state,
-            }
+            SlotWheelX { pcnl_id: i, pcnl_state, shuf_state }
         }
     }
 }
@@ -313,13 +300,11 @@ fn SlotWheelX(
     rsx! {
         div { class: "slot-box",
             div { class: "slot-display",
-                div { class: "pavaravan" },
-                div { class: "pavaravan2" },
-                div { class: "pavaravan3" },
-                div { class: "line-marker"},
-                SlotWheelInner {
-                    state,
-                }
+                div { class: "pavaravan" }
+                div { class: "pavaravan2" }
+                div { class: "pavaravan3" }
+                div { class: "line-marker" }
+                SlotWheelInner { state }
             }
         }
     }
@@ -334,7 +319,7 @@ fn SlotWheelInner(state: ReadOnlySignal<Option<(PcnlWheelState, WheelShuffleStat
                     pic_name: fruct.clone(),
                     pic_pos: i as u32,
                     pic_count: shuffle.shuffle.len() as u32,
-                    state: state.clone()
+                    state: state.clone(),
                 }
             }
         }
