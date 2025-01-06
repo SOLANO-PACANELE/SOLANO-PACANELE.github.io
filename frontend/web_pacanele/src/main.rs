@@ -4,7 +4,12 @@ use std::collections::HashMap;
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
 use web_pacanele::{
-    audio::AudioController, fruit_list::get_all_fruits, gen_css::{make_animation_string, make_transform_string}, random::{get_wheel_results, get_wheel_shuffle}, state::{PcnlState, PcnlWheelState, ShuffleState, WheelShuffleState, WheelStage}
+    audio::{send_audio_event, AudioEvent, make_audio_loop_coroutine},
+    fruit_list::get_all_fruits,
+    gen_css::{make_animation_string, make_transform_string},
+    random::{get_wheel_results, get_wheel_shuffle},
+    state::{PcnlState, PcnlWheelState, ShuffleState, WheelShuffleState, WheelStage},
+    time::{get_current_ts, sleep},
 };
 
 #[derive(Debug, Clone, Routable, PartialEq)]
@@ -36,12 +41,14 @@ fn App() -> Element {
 fn random_spin_period() -> f64 {
     let mut r = rand::thread_rng();
     use rand::Rng;
-    r.gen_range(2.5..6.3)
+    r.gen_range(1.5..2.3)
 }
 
 #[component]
 fn Pacanele() -> Element {
     info!("Paccanlee()");
+    make_audio_loop_coroutine();
+
     let pcnl_count: u32 = 3;
 
     let mut pcnl_state = use_signal(|| None);
@@ -57,7 +64,7 @@ fn Pacanele() -> Element {
                 .enumerate()
                 .map(|(i, x)| (x.clone(), i as u32))
                 .collect::<HashMap<String, u32>>();
-            
+
             let init_fruit = get_all_fruits()[0].clone();
             let init_idx = shuf_idx[&init_fruit];
             v2.push(WheelShuffleState {
@@ -78,7 +85,6 @@ fn Pacanele() -> Element {
                 wheel_stage: WheelStage::Ready,
                 rotations_diff: 0.0,
             });
-
         }
         pcnl_state.set(Some(PcnlState { wheels: v }));
         shuf_state.set(Some(ShuffleState { wheels: v2 }));
@@ -91,7 +97,6 @@ fn Pacanele() -> Element {
         }
         div { id: "left-box" }
         div { id: "bottom-box",
-            AudioController {}
         }
         div { id: "right-box",
             SpinButton {
@@ -108,22 +113,10 @@ fn Pacanele() -> Element {
                     shuf_state,
                     pcnl_count,
                 }
-            
+
             }
         }
     }
-}
-
-fn get_current_ts() -> f64 {
-    web_time::SystemTime::now().duration_since(web_time::UNIX_EPOCH).unwrap().as_secs_f64()
-}
-
-async fn sleep(secs: f64) {
-    use std::time::Duration;
-    let t0 = get_current_ts();
-    async_std::task::sleep(Duration::from_secs_f64(secs)).await;
-    let t1 = get_current_ts();
-    info!("sleep diff time: {} ms", (t1 - t0 - secs) * 1000.0);
 }
 
 #[component]
@@ -134,9 +127,9 @@ fn SpinButton(
 ) -> Element {
     info!("SpinButton()");
 
-    let show_button = use_memo(move || {
-        if let Some(PcnlState { wheels }) = pcnl_state.read().as_ref()
-        {
+    let mut effects_running = use_signal(|| false);
+    let wheels_ready = use_memo(move || {
+        if let Some(PcnlState { wheels }) = pcnl_state.read().as_ref() {
             for w in wheels.iter() {
                 if w.wheel_stage != WheelStage::Ready {
                     return false;
@@ -150,7 +143,7 @@ fn SpinButton(
 
     // Do whole spin sequence while locking the "spin" button
     let do_spin = move || async move {
-        if *show_button.peek() == false {
+        if *wheels_ready.peek() == false {
             info!("cannot spin.");
             return;
         }
@@ -165,6 +158,7 @@ fn SpinButton(
         // Start spin. we do not yet have spin results (can take 5-10s on chain),
         // so we spin in place from the starting position a whole (integer) number of spins.
         let spin_time = get_current_ts();
+        effects_running.set(true);
         for w in state.wheels.iter_mut() {
             w.wheel_stage = WheelStage::PendingResults;
             w.spin_period = random_spin_period();
@@ -173,22 +167,34 @@ fn SpinButton(
             w.old_idx = w.new_idx;
         }
         pcnl_state.set(Some(state.clone()));
+        send_audio_event(AudioEvent::StartSpin);
 
         let Ok(new_results) = get_wheel_results(pcnl_count).await else {
             info!("server_wheel_resutls spin error");
             return;
         };
         assert!(new_results.len() == state.wheels.len());
+        send_audio_event(AudioEvent::HaveResults);
 
         let mut _fut = vec![];
 
         // now that we have the results, we can diverge into each wheel
-        for (pcnl_id, (new_fruit, (mut wheel, w_shuf))) in new_results.into_iter().zip(state.wheels.iter().cloned().zip(_shuf.wheels.iter().cloned())).enumerate() {
+        for (pcnl_id, (new_fruit, (mut wheel, w_shuf))) in new_results
+            .into_iter()
+            .zip(
+                state
+                    .wheels
+                    .iter()
+                    .cloned()
+                    .zip(_shuf.wheels.iter().cloned()),
+            )
+            .enumerate()
+        {
             _fut.push(spawn(async move {
                 // wait until whole number of spins passes
                 let spin_period = wheel.spin_period;
                 let elapsed = get_current_ts() - spin_time;
-                let elapsed_periods =  elapsed / spin_period;
+                let elapsed_periods = elapsed / spin_period;
                 let remaining_period = 1.0 - elapsed_periods.fract();
                 let remaining_secs = remaining_period * spin_period;
                 sleep(remaining_secs).await;
@@ -197,10 +203,10 @@ fn SpinButton(
                 wheel.spin_count += 1;
                 wheel.old_fruit = wheel.new_fruit.clone();
                 wheel.new_fruit = new_fruit;
-                wheel.old_idx =  w_shuf.idx[&wheel.old_fruit];
-                wheel.new_idx =  w_shuf.idx[&wheel.new_fruit];
-                wheel.wheel_stage = WheelStage::HaveResults ;
-                
+                wheel.old_idx = w_shuf.idx[&wheel.old_fruit];
+                wheel.new_idx = w_shuf.idx[&wheel.new_fruit];
+                wheel.wheel_stage = WheelStage::HaveResults;
+
                 let pic_count = w_shuf.shuffle.len() as u32;
                 let slot_diff = (pic_count - wheel.new_idx + wheel.old_idx) % pic_count;
                 let slot_diff = if slot_diff == 0 { pic_count } else { slot_diff };
@@ -221,14 +227,29 @@ fn SpinButton(
                         x.wheels[pcnl_id as usize].wheel_stage = WheelStage::Ready;
                     }
                 }
-
+                
+                send_audio_event(AudioEvent::WheelStop { wheel_id: pcnl_id as u32 });
             }));
         }
+        // wait until all pcnl is ready, then send audio stop events
+        spawn(async move {
+            while !*wheels_ready.peek() {
+                sleep(0.1).await;
+            }
+            sleep(0.5).await;
+            send_audio_event(AudioEvent::WheelsFinished);
+            sleep(0.5).await;
+            send_audio_event(AudioEvent::StopAudio);
+            sleep(0.1).await;
+            effects_running.set(false);
+        });
+
+
     };
 
     rsx! {
         {
-            if *show_button.read() {
+            if *wheels_ready.read() && !*effects_running.read() {
                 info!("spin button on");
                 rsx! {
                     button {
@@ -248,7 +269,6 @@ fn SpinButton(
         }
     }
 }
-
 
 #[component]
 fn SlotWheelRow(
@@ -306,11 +326,8 @@ fn SlotWheelX(
 }
 
 #[component]
-fn SlotWheelInner(
-    state: ReadOnlySignal<Option<(PcnlWheelState, WheelShuffleState)>>,
-) -> Element {
+fn SlotWheelInner(state: ReadOnlySignal<Option<(PcnlWheelState, WheelShuffleState)>>) -> Element {
     if let Some((state, shuffle)) = state.read().as_ref() {
-
         rsx! {
             for (i , fruct) in shuffle.shuffle.iter().enumerate() {
                 SlotImage {
@@ -327,12 +344,7 @@ fn SlotWheelInner(
 }
 
 #[component]
-fn SlotImage(
-    pic_name: String,
-    pic_pos: u32,
-    pic_count: u32,
-    state: PcnlWheelState,
-) -> Element {
+fn SlotImage(pic_name: String, pic_pos: u32, pic_count: u32, state: PcnlWheelState) -> Element {
     let pic_pos_old = (pic_count + pic_pos - state.old_idx) % pic_count;
     let pic_pos_new = (pic_count + pic_pos - state.new_idx) % pic_count;
     let slot_diff = (pic_count + pic_pos_new - pic_pos_old) % pic_count;
@@ -348,9 +360,13 @@ fn SlotImage(
     let final_transform = make_transform_string(rad_new, pic_count);
     let animation = match state.wheel_stage {
         WheelStage::Ready => "".to_string(),
-        WheelStage::PendingResults => format!("animation: {spin_period}s linear infinite -{delay}s spin_1 ;"),
-        WheelStage::HaveResults => format!("animation: {spin_period}s linear {spin_count} -{delay}s spin_2 ;")
-    } ;
+        WheelStage::PendingResults => {
+            format!("animation: {spin_period}s linear infinite -{delay}s spin_1 ;")
+        }
+        WheelStage::HaveResults => {
+            format!("animation: {spin_period}s linear {spin_count} -{delay}s spin_2 ;")
+        }
+    };
 
     rsx! {
         img {

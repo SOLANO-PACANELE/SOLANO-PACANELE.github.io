@@ -23,10 +23,12 @@ pub fn make_transform_string(rad: f64, pic_count: u32) -> String {
     let z_index = ((rad.cos() - 2.0) * 100.0).round() as i32;
     let scale = 2.0 * std::f64::consts::PI / pic_count as f64 * 1.05 * size_coef;
     // info!("transform c={pic_count}   scale={scale}");
-    format!("
+    format!(
+        "
         transform: perspective(555cqmin)
             translate3d(120cqmin, {y}cqmin, {z}cqmin) 
             rotate3d(1, 0, 0, {rad}rad) scale3d({scale},{scale},{scale});
         z-index: {z_index};
-    ")
+    "
+    )
 }

@@ -16,16 +16,15 @@ pub struct PcnlWheelState {
     pub old_idx: u32,
     pub spin_period: f64,
     pub wheel_stage: WheelStage,
-    pub rotations_diff : f64,
+    pub rotations_diff: f64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum WheelStage {
     Ready,
     PendingResults,
-    HaveResults
+    HaveResults,
 }
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ShuffleState {

@@ -1,42 +1,106 @@
-use web_sys::{wasm_bindgen::JsValue, AudioContext, OscillatorType};
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
+use web_sys::{wasm_bindgen::JsValue, AudioContext, OscillatorType};
+
+use crate::{audio_tracks::{SoundSequenceInfo, SoundTrackOutput, TRACKS}, time::{get_current_ts, sleep}};
+
+#[derive(Debug, Clone, Copy)]
+pub enum AudioEvent {
+    StartSpin,
+    HaveResults,
+    WheelStop{wheel_id: u32},
+    WheelsFinished,
+    StopAudio
+}
+
+pub fn make_audio_loop_coroutine() {
+    let mut oscillators: Signal<Option<OscillatorList>> = use_signal(|| None);
+    let co = use_coroutine(move |mut _rx| async move {
+        let mut last_event = None;
+        let mut last_event_time = get_current_ts();
+        let mut ding_id = 0;
+        
+        let mut last_outputs = vec![SoundTrackOutput::default() ; TRACKS.len()];
+        loop {
+            ding_id += 1;
+            if let Ok(Some(event)) = _rx.try_next() {
+                last_event = Some(event);
+                last_event_time = get_current_ts();
+                info!("read audio event: {event:?}");
+                match event {
+                    AudioEvent::StartSpin => {
+                        oscillators.set(Some(OscillatorList::new(TRACKS.len() as u8)));
+                    },
+                    AudioEvent::StopAudio => {
+                        oscillators.set(None);
+                    },
+                    _ => {}
+                }
+            }
+
+            if let (Some(fms), Some(last_event)) = ( oscillators.write().as_mut(), last_event) {
+
+                let sequence_info = SoundSequenceInfo {
+                    last_event, ding_id, time_since_event: (get_current_ts() - last_event_time).max(0.0001),
+                };
+
+                for ((_fn, _last_output), _fm) in (TRACKS.iter().zip(last_outputs.iter_mut())).zip(fms.v.iter_mut()) {
+                    *_last_output = _fn(sequence_info, *_last_output);
+                    _fm.set_gain(_last_output.gain);
+                    _fm.set_note(_last_output.note);
+                    _fm.set_fm_amount(_last_output.fm_amount);
+                    _fm.set_fm_frequency(_last_output.fm_freq);
+                }
+            } else {
+                // no oscillators = no audio = more sleep pls
+                sleep(0.2).await;
+            }
+            sleep(0.11).await;
+        }
+    });
+    let tx: UnboundedSender<AudioEvent> = co.tx();
+
+    use_context_provider( move || tx);     
+}
+
+pub fn send_audio_event(ev: AudioEvent) {
+    let tx = use_context::<UnboundedSender<AudioEvent>>();
+    if let Err(e) = tx.unbounded_send(ev) 
+    {
+        info!("audio event send error: {e}");
+    } else {
+        info!("sent audio event: {ev:?}");
+    }
+}
 
 
-#[component]
-pub fn AudioController() -> Element {
-    let mut oscillator = use_signal(|| None);
-    let play = move |_| {
-        let mut fm = FmOsc::new().unwrap();
-        fm.set_note(50);
-        fm.set_fm_frequency(0.0);
-        fm.set_fm_amount(0.0);
-        fm.set_gain(0.8);
-        oscillator.set(Some(fm));
-    };
-    let stop = move |_| {
-        oscillator.set(None);
-    };
-    rsx! {
-        button {
-            onclick: play,
-            "Play Audio",
+struct OscillatorList {
+    v: Vec<FmOsc>,
+} 
+impl OscillatorList {
+    fn new(osc_count: u8) ->  Self {
+        assert!(osc_count < 10 && osc_count > 0);
+        let mut v = vec![];
+        for _x in 0..osc_count {        let mut fm = FmOsc::new().unwrap();
+            fm.set_note(60);
+            fm.set_fm_frequency(0.0);
+            fm.set_fm_amount(0.0);
+            fm.set_gain(0.0);
+            v.push(fm);
         }
-        button {
-            onclick: stop,
-            "Stop Audio",
-        }
+
+        Self {v}
     }
 }
 
 /// Converts a midi note to frequency
 ///
 /// A midi note is an integer, generally in the range of 21 to 108
-pub fn midi_to_freq(note: u8) -> f32 {
+fn midi_to_freq(note: u8) -> f32 {
     27.5 * 2f32.powf((note as f32 - 21.0) / 12.0)
 }
 
-pub struct FmOsc {
+struct FmOsc {
     ctx: AudioContext,
     /// The primary oscillator.  This will be the fundamental frequency
     primary: web_sys::OscillatorNode,
