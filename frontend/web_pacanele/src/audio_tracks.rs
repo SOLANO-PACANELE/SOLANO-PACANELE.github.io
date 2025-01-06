@@ -62,8 +62,6 @@ fn sound_track_1(info: SoundSequenceInfo, prev: SoundTrackOutput) -> SoundTrackO
 
     let note = random_arp_note(60, prev.note, &arp);
 
-    info!("ding {note}");
-
     SoundTrackOutput {
         note,
         gain,

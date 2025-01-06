@@ -29,7 +29,6 @@ pub fn make_audio_loop_coroutine() {
             if let Ok(Some(event)) = _rx.try_next() {
                 last_event = Some(event);
                 last_event_time = get_current_ts();
-                info!("read audio event: {event:?}");
                 match event {
                     AudioEvent::StartSpin => {
                         oscillators.set(Some(OscillatorList::new(TRACKS.len() as u8)));
@@ -74,7 +73,6 @@ pub fn send_audio_event(ev: AudioEvent) {
     if let Err(e) = tx.unbounded_send(ev) {
         info!("audio event send error: {e}");
     } else {
-        info!("sent audio event: {ev:?}");
     }
 }
 
