@@ -4,10 +4,13 @@ use rand::{thread_rng, Rng};
 
 use crate::get_all_fruits;
 
-#[derive(Debug)]
+use serde::{Deserialize, Serialize};
+use serde_json::Result;
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RuleSet {
-    prob: HashMap<&'static str, u16>,
-    rewards: HashMap<(&'static str, u8), u16>,
+    prob: HashMap<String, u16>,
+    rewards: HashMap<(String, u8), u16>,
     wheel_count: u8,
 }
 
@@ -46,17 +49,17 @@ pub fn random_prob_space(len: usize) -> Vec<u16> {
 }
 
 
-fn get_random_index_per_density(mut rand_val: u16, prob: & HashMap<&'static str, u16>) -> &'static str {
+fn get_random_index_per_density(mut rand_val: u16, prob: & HashMap<String, u16>) -> String {
     assert!(prob.len() > 2);
     assert!(prob.len() < 200);
 
     for i in prob.keys() {
         if rand_val <= prob[i] {
-            return *i;
+            return i.to_string();
         }
         rand_val -= prob[i];
     }
-    return prob.keys().next().unwrap();
+    return prob.keys().next().unwrap().to_string();
 }
 /// get_prob(p, "banana", 1, 3) = prob that banana hits 1 time = p(banana, x, x) + p(x, banana, x) + p(x, x, banana), x != banana
 ///     p(x) = 1 - prob[fruit]
@@ -66,7 +69,7 @@ fn get_random_index_per_density(mut rand_val: u16, prob: & HashMap<&'static str,
 ///  p(banana, 3, 3) = C(3, 3) * p(banana)^3 * p(x)^0
 /// get_prob(p, "banana", 2, 3)
 /// get_prob(p, "banana", 3, 3)
-fn get_prob_for_index_and_density( prob: & HashMap<&str, u16>, fruit: &str, count: u8, total: u8) -> f64 {
+fn get_prob_for_index_and_density( prob: & HashMap<String, u16>, fruit: &str, count: u8, total: u8) -> f64 {
     assert!(count > 0);
     assert!(count <= total);
     assert!(total > 1);
@@ -96,35 +99,36 @@ impl RuleSet {
     pub fn play_monte_carlo(&self, count: u32) -> f64 {
         let mut reward_total: f64 = 0.;
         for _i in 0..count {
-            reward_total += self.play_random() as f64;
+            reward_total += self.play_random().1 as f64;
         }
         let avg_reward = reward_total / count as f64;
         println!("avg_reward={avg_reward}  N={count}");
         avg_reward
     }
-    pub fn play_random(&self) -> u16 {
+    pub fn play_random(&self) -> (Vec<String>, u16) {
         let r: [u16; 3] = thread_rng().gen();
         self.play_random_from_seed(r)
     }
-    pub fn play_random_from_seed(&self, random_seed: [u16;3]) -> u16 {
+    pub fn play_random_from_seed(&self, random_seed: [u16;3]) -> (Vec<String>, u16) {
         let mut result = vec![];
         let mut fruit_hits = HashMap::new();
         for i in 0..3 {
             let x = get_random_index_per_density(random_seed[i], &self.prob);
-            result.push(x);
+            result.push(x.to_string());
             let old_val = fruit_hits.get(&x);
             let new_val = if let Some(old_val) = old_val {old_val+ 1} else {1};
             fruit_hits.insert(x, new_val);
+
         }
 
         // println!("hash = {fruit_hits:?}");
         let mut reward: u32 = 0;
         for (fruit, count) in fruit_hits.iter() {
-            let rrr = *self.rewards.get(&(*fruit, *count)).unwrap_or(&0);
+            let rrr = *self.rewards.get(&(fruit.to_string(), *count)).unwrap_or(&0);
             reward += rrr as u32;
         }
 
-        reward.clamp(0, 55666) as u16
+        (result, reward.clamp(0, 55666) as u16)
     }
     pub fn random_rule_set(desired_pay: f64) -> Self {
         assert!(desired_pay >= 0.5);
@@ -132,22 +136,22 @@ impl RuleSet {
 
         let wheel_count = 3;
 
-        let fruits = get_all_fruits();
+        let fruits = get_all_fruits().map(|x| x.to_string());
         let prob = random_prob_space(fruits.len());
-        let prob: HashMap<&str, u16> = HashMap::from_iter(fruits.iter().cloned().zip(prob.iter().cloned()));
+        let prob: HashMap<String, u16> = HashMap::from_iter(fruits.iter().cloned().zip(prob.iter().cloned()));
 
         let mut rewards = HashMap::new();
         for fruit in fruits {
-            let p_fruit = prob[fruit] as f64 / std::u16::MAX as f64;
+            let p_fruit = prob[&fruit] as f64 / std::u16::MAX as f64;
             for score in 2..=wheel_count {
-                let prob = get_prob_for_index_and_density(&prob, fruit, score, wheel_count);
+                let prob = get_prob_for_index_and_density(&prob, &fruit, score, wheel_count);
                 assert!(prob > 0.0);
                 assert!(prob < 1.0);
                 let max_reward =( 1.0 / prob * p_fruit / 2.0 ).clamp(0.0, 55666.0);
                 let max_reward_i = max_reward as u64;
                 let r_u16 = max_reward_i.clamp(0, 55666) as u16;
                 // println!("{fruit}x{score}   =>>>   reward_f: {max_reward}, reward_i: {max_reward_i}, reward_u16 = {r_u16}");
-                rewards.insert((fruit, score), r_u16 );
+                rewards.insert((fruit.clone(), score), r_u16 );
             }
         }
 

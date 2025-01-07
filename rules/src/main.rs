@@ -1,17 +1,6 @@
-use rules::rule_set::RuleSet;
+use rules::{get_default_rule_set, rule_set::RuleSet};
 fn main() {
-
-
-    for i in 5..=15 {
-        let i = i as f64 / 10.0;
-        
-        let p = RuleSet::random_rule_set(i).play_monte_carlo(100000);
-        println!("I(dorit) = {} , P(primit) = {}", i, p);
-
-    }
-    let r =  RuleSet::random_rule_set(0.96);
-    println!("{:?}",r);
-
+    let r = get_default_rule_set();
     
     r.play_monte_carlo(10);
     r.play_monte_carlo(100);
