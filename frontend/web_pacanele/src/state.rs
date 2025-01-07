@@ -3,6 +3,8 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, PartialEq)]
 pub struct PcnlState {
     pub wheels: Vec<PcnlWheelState>,
+    pub money: u64,
+    pub last_win: Option<u16>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

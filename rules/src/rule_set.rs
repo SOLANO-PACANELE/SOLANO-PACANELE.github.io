@@ -147,7 +147,7 @@ impl RuleSet {
                 let prob = get_prob_for_index_and_density(&prob, &fruit, score, wheel_count);
                 assert!(prob > 0.0);
                 assert!(prob < 1.0);
-                let max_reward =( 1.0 / prob * p_fruit / 2.0 ).clamp(0.0, 55666.0);
+                let max_reward =( 1.0 / prob * p_fruit - 1.0 ).clamp(0.0, 55666.0);
                 let max_reward_i = max_reward as u64;
                 let r_u16 = max_reward_i.clamp(0, 55666) as u16;
                 // println!("{fruit}x{score}   =>>>   reward_f: {max_reward}, reward_i: {max_reward_i}, reward_u16 = {r_u16}");

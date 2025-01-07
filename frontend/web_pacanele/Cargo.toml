@@ -26,6 +26,9 @@ web-sys = {version="0.3.76", features = [
   "OscillatorNode",
   "OscillatorType",
 ]}
+rules = {path = "../../rules"}
+futures = "0.3.31"
+futures-util = "0.3.31"
 
 [features]
 # default = ["web", "server"]

@@ -1,5 +1,5 @@
 use core::f64;
-use std::collections::HashMap;
+use std::{collections::HashMap};
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
@@ -41,7 +41,7 @@ fn App() -> Element {
 fn random_spin_period() -> f64 {
     let mut r = rand::thread_rng();
     use rand::Rng;
-    r.gen_range(1.5..2.3)
+    r.gen_range(0.2..0.5)
 }
 
 #[component]
@@ -53,6 +53,7 @@ fn Pacanele() -> Element {
 
     let mut pcnl_state = use_signal(|| None);
     let mut shuf_state = use_signal(|| None);
+    let enable_autoplay = use_signal(|| false);
     let _init_state = use_resource(move || async move {
         info!("init_state");
         let mut v = vec![];
@@ -86,19 +87,36 @@ fn Pacanele() -> Element {
                 rotations_diff: 0.0,
             });
         }
-        pcnl_state.set(Some(PcnlState { wheels: v }));
+        pcnl_state.set(Some(PcnlState { wheels: v, money: 0, last_win: None }));
         shuf_state.set(Some(ShuffleState { wheels: v2 }));
         info!("init state done");
     });
 
+    let credit_string = use_memo(move || {
+        if let Some(p) = pcnl_state.read().as_ref() {
+            format!("credit: {}", p.money)
+        } else {
+            "".to_string()
+        }
+    });
+
+
     rsx! {
         div { id: "top-box",
-            DebugSpinResult { pcnl_state }
+            // DebugSpinResult { pcnl_state }
+            Win {pcnl_state}
         }
-        div { id: "left-box" }
-        div { id: "bottom-box" }
+        div { id: "left-box" ,
+            h1 {
+                {credit_string}
+            }
+        }
+        div { 
+            id: "bottom-box",
+            Autoplay{enable_autoplay}
+        }
         div { id: "right-box",
-            SpinButton { pcnl_state, shuf_state, pcnl_count }
+            SpinButton { pcnl_state, shuf_state, pcnl_count, enable_autoplay }
         }
 
         div { id: "pacanele",
@@ -111,16 +129,72 @@ fn Pacanele() -> Element {
 }
 
 #[component]
+pub fn Autoplay(enable_autoplay: Signal<bool>) -> Element {
+    let mut name = use_signal(|| "false".to_string());
+
+    use_effect(move || {
+        let n = name.read().clone();
+        if n == "true" {
+            enable_autoplay.set(true);
+        } else {
+            enable_autoplay.set(false);
+        }
+    });
+
+    rsx! {
+        h3 {
+            "autoplay",
+            input {
+                r#type: "checkbox",
+                // we tell the component what to render
+                value: "{name}",
+                // and what to do when the value changes
+                oninput: move |event| name.set(event.value())
+            }
+        }
+    }
+}
+
+#[component]
+fn Win(pcnl_state:  Signal<Option<PcnlState>>,) -> Element {
+    if let Some(r) = pcnl_state.read().as_ref() {
+        if let Some(w) = r.last_win {
+            rsx! {
+                h1 {
+                    color: "red",
+                    "Win: " {format!("{}", w)}
+                }
+            }
+        }
+        else {
+            rsx!{}
+        }
+    } else {
+        rsx!{}
+    }
+
+}
+
+#[component]
 fn SpinButton(
     pcnl_state: Signal<Option<PcnlState>>,
     shuf_state: Signal<Option<ShuffleState>>,
     pcnl_count: u32,
+    enable_autoplay: ReadOnlySignal<bool>
 ) -> Element {
     info!("SpinButton()");
 
     let mut effects_running = use_signal(|| false);
+    let mut have_money = use_memo(move || {
+        if let Some(s) = pcnl_state.read().as_ref() {
+            let m = s.money;
+            m > 0
+        } else {
+            false
+        }
+    });
     let wheels_ready = use_memo(move || {
-        if let Some(PcnlState { wheels }) = pcnl_state.read().as_ref() {
+        if let Some(PcnlState { wheels, .. }) = pcnl_state.read().as_ref() {
             for w in wheels.iter() {
                 if w.wheel_stage != WheelStage::Ready {
                     return false;
@@ -132,84 +206,115 @@ fn SpinButton(
         }
     });
 
-    // Do whole spin sequence while locking the "spin" button
-    let do_spin = move || async move {
-        if *wheels_ready.peek() == false {
-            info!("cannot spin.");
-            return;
-        }
-        let Some(_shuf) = shuf_state.peek().clone() else {
-            info!("shuf empty before spin");
-            return;
-        };
-        let Some(mut state) = pcnl_state.peek().clone() else {
-            info!("state empty before spin.");
-            return;
-        };
-        // Start spin. we do not yet have spin results (can take 5-10s on chain),
-        // so we spin in place from the starting position a whole (integer) number of spins.
-        let spin_time = get_current_ts();
-        effects_running.set(true);
-        for w in state.wheels.iter_mut() {
-            w.wheel_stage = WheelStage::PendingResults;
-            w.spin_period = random_spin_period();
-            // also set old fruit to the new one, to have correct spin
-            w.old_fruit = w.new_fruit.clone();
-            w.old_idx = w.new_idx;
-        }
-        pcnl_state.set(Some(state.clone()));
-        send_audio_event(AudioEvent::StartSpin);
-
-        let Ok(new_results) = get_wheel_results(pcnl_count).await else {
-            info!("server_wheel_resutls spin error");
-            return;
-        };
-        assert!(new_results.len() == state.wheels.len());
-        send_audio_event(AudioEvent::HaveResults);
-
-        // now that we have the results, we can diverge into each wheel
-        let mut _fut = vec![];
-        for seq in compute_wheel_sequences(&state, &_shuf, new_results, spin_time) {
-            _fut.push(spawn(async move {
-                sleep(seq.first_wait).await;
-                if let Some(x) = pcnl_state.write().as_mut() {
-                    x.wheels[seq.pcnl_id as usize] = seq.first_val;
+    let mut do_auto_respin = use_signal(|| false);
+    let spin_courutine = use_coroutine(move |mut rx: UnboundedReceiver<()>| {
+        async move {
+            loop {
+                use futures_util::stream::StreamExt;
+                let _rx = rx.next().await;
+                if *wheels_ready.peek() == false {
+                    info!("cannot spin.");
+                    continue;
                 }
-                sleep(seq.second_wait).await;
-                if let Some(x) = pcnl_state.write().as_mut() {
-                    x.wheels[seq.pcnl_id as usize] = seq.second_val;
+                let Some(_shuf) = shuf_state.peek().clone() else {
+                    info!("shuf empty before spin");
+                    continue;
+                };
+                let Some(mut state) = pcnl_state.peek().clone() else {
+                    info!("state empty before spin.");
+                    continue;
+                };
+                if state.money == 0 {
+                    info!("no money");
+                    continue;
                 }
-                send_audio_event(AudioEvent::WheelStop {
-                    wheel_id: seq.pcnl_id,
-                    pcnl_count
+                state.money -= 1;
+                state.last_win = None;
+                // Start spin. we do not yet have spin results (can take 5-10s on chain),
+                // so we spin in place from the starting position a whole (integer) number of spins.
+                let spin_time = get_current_ts();
+                effects_running.set(true);
+                
+                do_auto_respin.set(false);
+                for w in state.wheels.iter_mut() {
+                    w.wheel_stage = WheelStage::PendingResults;
+                    w.spin_period = random_spin_period();
+                    // also set old fruit to the new one, to have correct spin
+                    w.old_fruit = w.new_fruit.clone();
+                    w.old_idx = w.new_idx;
+                }
+                pcnl_state.set(Some(state.clone()));
+                send_audio_event(AudioEvent::StartSpin);
+        
+                let Ok((new_results, new_reward)) = get_wheel_results(pcnl_count).await else {
+                    info!("server_wheel_resutls spin error");
+                    continue;
+                };
+                assert!(new_results.len() == state.wheels.len());
+                send_audio_event(AudioEvent::HaveResults);
+        
+                // now that we have the results, we can diverge into each wheel
+                let mut _fut = vec![];
+                for seq in compute_wheel_sequences(&state, &_shuf, new_results, spin_time) {
+                    _fut.push(spawn(async move {
+                        sleep(seq.first_wait).await;
+                        if let Some(x) = pcnl_state.write().as_mut() {
+                            x.wheels[seq.pcnl_id as usize] = seq.first_val;
+                        }
+                        sleep(seq.second_wait).await;
+                        if let Some(x) = pcnl_state.write().as_mut() {
+                            x.wheels[seq.pcnl_id as usize] = seq.second_val;
+                        }
+                        send_audio_event(AudioEvent::WheelStop {
+                            wheel_id: seq.pcnl_id,
+                            pcnl_count
+                        });
+                    }));
+                }
+        
+                // wait until all pcnl is ready, then send audio stop events
+                spawn(async move {
+                    while !*wheels_ready.peek() {
+                        sleep(0.1).await;
+                    }
+                    sleep(0.4).await;
+                    send_audio_event(AudioEvent::WheelsFinished);
+                    if let Some(x) = pcnl_state.write().as_mut() {
+                        x.money += new_reward  as u64;
+                        x.last_win = if new_reward > 0 {Some(new_reward)} else {None};
+                    }
+                    
+                    sleep(0.1).await;
+                    send_audio_event(AudioEvent::StopAudio);
+                    sleep(0.1).await;
+                    effects_running.set(false);
+        
+                    if * enable_autoplay.peek() {
+                        do_auto_respin.set(true);
+                    }
                 });
-            }));
-        }
-
-        // wait until all pcnl is ready, then send audio stop events
-        spawn(async move {
-            while !*wheels_ready.peek() {
-                sleep(0.1).await;
             }
-            sleep(0.4).await;
-            send_audio_event(AudioEvent::WheelsFinished);
-            sleep(0.1).await;
-            send_audio_event(AudioEvent::StopAudio);
-            sleep(0.1).await;
-            effects_running.set(false);
-        });
-    };
+        }
+    });
+    let tx = spin_courutine.tx();
+
+    let tx2 = tx.clone();
+    use_effect(move || {
+        if * do_auto_respin.read() {
+            let _ = tx2.unbounded_send(());
+        }
+    });
 
     rsx! {
         {
-            if *wheels_ready.read() && !*effects_running.read() {
+            if *wheels_ready.read() && !*effects_running.read() && *have_money.read() {
                 info!("spin button on");
                 rsx! {
                     button {
                         onclick: move |_ev| {
-                            let do_spin = do_spin.clone();
+                            let tx = tx.clone();
                             async move {
-                                do_spin().await;
+                                let _ = tx.unbounded_send(());
                             }
                         },
                         h1 { "Spin" }
@@ -218,6 +323,22 @@ fn SpinButton(
             } else {
                 info!("spin button off");
                 rsx! {}
+            }
+        }
+        {
+            if !*have_money.read() {
+                rsx! {
+                    button {
+                        onclick: move |_ev| {
+                            if let Some(x) = pcnl_state.write().as_mut() {
+                                x.money = 500;
+                            }
+                        },
+                        h1 { "Da si mie 5 lei boss" }
+                    }
+                }
+            } else {
+                rsx!{}
             }
         }
     }

@@ -74,9 +74,9 @@ fn sound_track_2(info: SoundSequenceInfo, _prev: SoundTrackOutput) -> SoundTrack
     let gain = match info.last_event {
         AudioEvent::WheelStop { .. } => {
             if info.time_since_event < 0.2 {
-                1.0
+                0.7
             } else if info.time_since_event < 0.4 {
-                (1.0 - (info.time_since_event - 0.2) * 2.0).clamp(0.0, 1.0)
+                (0.7 - (info.time_since_event - 0.2) * 2.0).clamp(0.0, 1.0)
             } else {
                 0.0
             }

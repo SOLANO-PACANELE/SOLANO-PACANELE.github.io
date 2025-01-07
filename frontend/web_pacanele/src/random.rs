@@ -1,19 +1,19 @@
 use core::f64;
 
 use dioxus::prelude::*;
+use dioxus_logger::tracing::info;
 use rand::thread_rng;
 
-#[server]
-pub async fn get_wheel_results(pcnl_count: u32) -> Result<Vec<String>, ServerFnError> {
-    assert!(pcnl_count > 0 && pcnl_count < 6);
-    let mut res = vec![];
-    res.reserve(pcnl_count as usize);
-    for _i in 0..pcnl_count {
-        res.push(srv_get_random_pcnl().await);
-    }
-    _wait_random(1.5, 6.5).await;
+use rules::get_default_rule_set;
 
-    Ok(res)
+#[server]
+pub async fn get_wheel_results(pcnl_count: u32) -> Result<(Vec<String>, u16), ServerFnError> {
+    assert!(pcnl_count==3);
+
+    let (result, reward) = rules::get_default_rule_set().play_random();
+    info!("{result:?} => {reward}");
+
+    Ok((result, reward))
 }
 
 #[cfg(feature = "server")]
