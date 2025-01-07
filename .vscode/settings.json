@@ -4,6 +4,7 @@
     "rust-analyzer.linkedProjects": [
         "pacanele2/Cargo.toml",
         "frontend/Cargo.toml",
+        "rules/Cargo.toml",
     ],
     "rust-analyzer.statusBar.documentSelector": [
         {

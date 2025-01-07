@@ -24,7 +24,7 @@ pub struct AudioSettings {
 
 impl Default for AudioSettings {
     fn default() -> Self {
-        Self { volume: 0.05 }
+        Self { volume: 0.25 }
     }
 }
 
