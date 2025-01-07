@@ -331,7 +331,7 @@ fn SpinButton(
                     button {
                         onclick: move |_ev| {
                             if let Some(x) = pcnl_state.write().as_mut() {
-                                x.money = 500;
+                                x.money = 50;
                             }
                         },
                         h1 { "Da si mie 5 lei boss" }
