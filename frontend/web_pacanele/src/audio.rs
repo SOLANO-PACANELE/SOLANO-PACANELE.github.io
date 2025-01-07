@@ -16,8 +16,23 @@ pub enum AudioEvent {
     StopAudio,
 }
 
+
+#[derive(Debug, Clone, Copy)]
+pub struct AudioSettings {
+    volume: f64,
+}
+
+impl Default for AudioSettings {
+    fn default() -> Self {
+        Self { volume: 0.05 }
+    }
+}
+
 pub fn make_audio_loop_coroutine() {
     let mut oscillators: Signal<Option<OscillatorList>> = use_signal(|| None);
+    let audio_settings = use_signal(|| AudioSettings::default());
+    use_context_provider(move || audio_settings);
+
     let co = use_coroutine(move |mut _rx| async move {
         let mut last_event = None;
         let mut last_event_time = get_current_ts();
@@ -51,14 +66,13 @@ pub fn make_audio_loop_coroutine() {
                     (TRACKS.iter().zip(last_outputs.iter_mut())).zip(fms.v.iter_mut())
                 {
                     *_last_output = _fn(sequence_info, *_last_output);
-                    _fm.set_gain(_last_output.gain);
-                    _fm.set_note(_last_output.note);
-                    _fm.set_fm_amount(_last_output.fm_amount);
-                    _fm.set_fm_frequency(_last_output.fm_freq);
+                    _fm.set_gain(_last_output.gain.clamp(0.0, 1.0) * audio_settings.peek().volume.clamp(0.0,1.0) as f32);
+                    _fm.set_note(_last_output.note.clamp(20,127));
+                    _fm.set_fm_amount(_last_output.fm_amount.clamp(0.0,1.0));
+                    _fm.set_fm_frequency(_last_output.fm_freq.clamp(0.0,1.0));
                 }
             } else {
-                // no oscillators = no audio = more sleep pls
-                sleep(0.2).await;
+                // no oscillators = no audio
             }
             sleep(0.11).await;
         }

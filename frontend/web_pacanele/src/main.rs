@@ -315,10 +315,8 @@ fn SlotWheelX(
     pcnl_state: ReadOnlySignal<Option<PcnlState>>,
     shuf_state: ReadOnlySignal<Option<ShuffleState>>,
 ) -> Element {
-    info!("SlotWheelX({pcnl_id})");
     let mut state = use_signal(|| None);
     use_effect(move || {
-        info!("SlotWheelXMemo({pcnl_id})");
         // let have_result = *have_result.read();
         if let (Some(data), Some(shuf)) = (pcnl_state.read().as_ref(), shuf_state.read().as_ref()) {
             let _state = data.wheels[pcnl_id as usize].clone();
