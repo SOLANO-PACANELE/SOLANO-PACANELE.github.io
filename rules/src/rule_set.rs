@@ -20,13 +20,13 @@ pub fn random_prob_space(len: usize) -> Vec<u16> {
     // pick random values but keep min,max
     let mut r = rand::thread_rng();
     // prob_var = how many times more probable one chip is as to another
-    let prob_var = 100.0;
+    let prob_var = 4.0;
     let mut some_prob = vec![];
     for _ in 0..(len-2) {
         some_prob.push(r.gen_range(1.0..prob_var));
     }
     some_prob.push(1.0);
-    some_prob.push(prob_var);
+    some_prob.push(prob_var*1.2);
 
     // normalize
     let prob_sum: f64 = some_prob.iter().sum();
@@ -118,7 +118,6 @@ impl RuleSet {
             let old_val = fruit_hits.get(&x);
             let new_val = if let Some(old_val) = old_val {old_val+ 1} else {1};
             fruit_hits.insert(x, new_val);
-
         }
 
         // println!("hash = {fruit_hits:?}");
@@ -130,6 +129,18 @@ impl RuleSet {
 
         (result, reward.clamp(0, 55666) as u16)
     }
+    pub fn projected_return(&self) -> f64 {
+        let mut z = 0.0;
+
+        for ((fruit, count), reward) in self.rewards.iter() {
+            let prob = get_prob_for_index_and_density(&self.prob, fruit, *count, self.wheel_count);
+            let ev = prob * *reward as f64;
+            z += ev;
+            
+            println!("{fruit} x {count} ==> r={reward}  p={prob}  ev={ev}");
+        }
+        z
+    }
     pub fn random_rule_set(desired_pay: f64) -> Self {
         assert!(desired_pay >= 0.5);
         assert!(desired_pay <= 2.0);
@@ -137,17 +148,18 @@ impl RuleSet {
         let wheel_count = 3;
 
         let fruits = get_all_fruits().map(|x| x.to_string());
+        let fruits_len_f64 = fruits.len() as f64;
         let prob = random_prob_space(fruits.len());
         let prob: HashMap<String, u16> = HashMap::from_iter(fruits.iter().cloned().zip(prob.iter().cloned()));
 
         let mut rewards = HashMap::new();
         for fruit in fruits {
             let p_fruit = prob[&fruit] as f64 / std::u16::MAX as f64;
-            for score in 2..=wheel_count {
+            for score in 1..=wheel_count {
                 let prob = get_prob_for_index_and_density(&prob, &fruit, score, wheel_count);
                 assert!(prob > 0.0);
                 assert!(prob < 1.0);
-                let max_reward =( 1.0 / prob * p_fruit - 1.0 ).clamp(0.0, 55666.0);
+                let max_reward = ( desired_pay / prob / fruits_len_f64 ).clamp(0.0, 55666.0);
                 let max_reward_i = max_reward as u64;
                 let r_u16 = max_reward_i.clamp(0, 55666) as u16;
                 // println!("{fruit}x{score}   =>>>   reward_f: {max_reward}, reward_i: {max_reward_i}, reward_u16 = {r_u16}");
@@ -155,6 +167,30 @@ impl RuleSet {
             }
         }
 
-        RuleSet { prob, rewards: rewards, wheel_count }
+        // hardcode cherry 
+        rewards.insert(("cherry".to_string(), 1), 1);
+
+        for _ in 0..10 {
+            let projected = RuleSet { prob: prob.clone(), rewards: rewards.clone(), wheel_count }.projected_return();
+            let coef = desired_pay / projected;
+            for (_k, _v) in rewards.iter_mut(){
+                if *_v > 3 {
+                    *_v =( (*_v as f64) * coef * thread_rng().gen_range(0.9999..1.0)).floor().clamp(0.0, 55666.0) as u16;
+                }
+            }
+            println!("projected: {projected}");
+        }
+        RuleSet { prob, rewards, wheel_count }
+    }
+
+    pub fn default_rule_set() -> Self {
+        crate::get_default_rule_set()
+    }
+
+    pub fn prob(&self ) ->  HashMap<String, u16> {
+        self.prob.clone()
+    }
+    pub fn rewards( &self ) ->  HashMap<(String, u8), u16> {
+        self.rewards.clone()
     }
 }

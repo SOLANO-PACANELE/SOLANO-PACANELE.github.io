@@ -3,6 +3,7 @@ use std::{collections::HashMap};
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
+use rules::rule_set::RuleSet;
 use web_pacanele::{
     audio::{make_audio_loop_coroutine, send_audio_event, AudioEvent},
     fruit_list::get_all_fruits,
@@ -38,10 +39,14 @@ fn App() -> Element {
     }
 }
 
-fn random_spin_period() -> f64 {
+fn random_spin_period(on_autoplay: bool) -> f64 {
     let mut r = rand::thread_rng();
     use rand::Rng;
-    r.gen_range(0.2..0.5)
+    if on_autoplay {
+        r.gen_range(0.2..0.5)
+    } else {
+        r.gen_range(1.6..2.6)
+    }
 }
 
 #[component]
@@ -82,7 +87,7 @@ fn Pacanele() -> Element {
                 spin_count: 0,
                 new_idx: init_idx,
                 old_idx: init_idx,
-                spin_period: random_spin_period(),
+                spin_period: random_spin_period(*enable_autoplay.peek()),
                 wheel_stage: WheelStage::Ready,
                 rotations_diff: 0.0,
             });
@@ -108,8 +113,10 @@ fn Pacanele() -> Element {
         }
         div { id: "left-box" ,
             h1 {
+                style: "font-size: 400%",
                 {credit_string}
             }
+            DisplayWinCombo {}
         }
         div { 
             id: "bottom-box",
@@ -129,6 +136,41 @@ fn Pacanele() -> Element {
 }
 
 #[component]
+fn DisplayWinCombo() -> Element {
+    let r =  RuleSet::default_rule_set().rewards();
+    let mut r =r.iter().filter(|x| {
+        *x.1 > 0
+    }).map(|x| ((x.0.0.to_string(), x.0.1), *x.1)).collect::<Vec<_>>();
+    r.sort_by_key(|a| {
+        -(a.1 as i32) - a.0.1 as i32
+    });
+
+    rsx! {
+        div {
+            class: "display-win-combo",
+            for ((fruit, count), reward) in r {
+                DisplayWinSingleCombo {fruit, count, reward}
+            }
+        }
+    }
+}
+#[component]
+fn DisplayWinSingleCombo(fruit: String, count: u8, reward: u16) -> Element {
+    rsx! {
+        div {
+            class: "display-win-combo-single",
+            for _i in 0..count {
+                img {
+                    class: "combo-image",
+                    src: "/assets/img2/fruit/{fruit}.png",
+                }
+            }
+            {format!("{reward}")}
+        }
+    }
+}
+
+#[component]
 pub fn Autoplay(enable_autoplay: Signal<bool>) -> Element {
     let mut name = use_signal(|| "false".to_string());
 
@@ -142,10 +184,12 @@ pub fn Autoplay(enable_autoplay: Signal<bool>) -> Element {
     });
 
     rsx! {
-        h3 {
-            "autoplay",
+        h1 {
+            style: "display: flex; align-items: center;",
+            "Autoplay",
             input {
                 r#type: "checkbox",
+                style: "width: 40pt; height: 40pt;",
                 // we tell the component what to render
                 value: "{name}",
                 // and what to do when the value changes
@@ -161,7 +205,7 @@ fn Win(pcnl_state:  Signal<Option<PcnlState>>,) -> Element {
         if let Some(w) = r.last_win {
             rsx! {
                 h1 {
-                    color: "red",
+                    style:"font-size:400%;color:red;",
                     "Win: " {format!("{}", w)}
                 }
             }
@@ -212,6 +256,9 @@ fn SpinButton(
             loop {
                 use futures_util::stream::StreamExt;
                 let _rx = rx.next().await;
+                while let Ok(Some(_m)) = rx.try_next() {
+                    // drop duplicate messages, we're already in.
+                }
                 if *wheels_ready.peek() == false {
                     info!("cannot spin.");
                     continue;
@@ -238,7 +285,8 @@ fn SpinButton(
                 do_auto_respin.set(false);
                 for w in state.wheels.iter_mut() {
                     w.wheel_stage = WheelStage::PendingResults;
-                    w.spin_period = random_spin_period();
+                    w.spin_period = random_spin_period(*enable_autoplay.peek());
+                
                     // also set old fruit to the new one, to have correct spin
                     w.old_fruit = w.new_fruit.clone();
                     w.old_idx = w.new_idx;
@@ -289,7 +337,11 @@ fn SpinButton(
                     sleep(0.1).await;
                     effects_running.set(false);
         
+                    sleep(0.2).await;
                     if * enable_autoplay.peek() {
+                        if new_reward > 0 {
+                            sleep(1.5).await;
+                        }
                         do_auto_respin.set(true);
                     }
                 });
