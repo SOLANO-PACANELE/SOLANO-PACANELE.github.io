@@ -1,6 +1,2 @@
-- install agave 2.1.6 command line tools from here:
-    - https://docs.anza.xyz/cli/install 
-    - https://release.anza.xyz/v2.1.6/agave-install-init-x86_64-pc-windows-msvc.exe
-    - run as administrator
 - install docker desktop for windows
 - bash docker_start.sh

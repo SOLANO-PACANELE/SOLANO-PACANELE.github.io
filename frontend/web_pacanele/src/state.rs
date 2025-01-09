@@ -1,18 +1,20 @@
 use std::collections::HashMap;
+use rules::Fruit;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PcnlState {
     pub wheels: Vec<PcnlWheelState>,
     pub money: u64,
     pub last_win: Option<u16>,
+    pub last_messages: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PcnlWheelState {
     pub pcnl_id: u32,
     pub pcnl_count: u32,
-    pub new_fruit: String,
-    pub old_fruit: String,
+    pub new_fruit: rules::Fruit,
+    pub old_fruit: rules::Fruit,
     pub spin_count: u32,
     pub new_idx: u32,
     pub old_idx: u32,
@@ -21,7 +23,7 @@ pub struct PcnlWheelState {
     pub rotations_diff: f64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum WheelStage {
     Ready,
     PendingResults,
@@ -36,6 +38,6 @@ pub struct ShuffleState {
 #[derive(Debug, Clone, PartialEq)]
 pub struct WheelShuffleState {
     pub pcnl_id: u32,
-    pub shuffle: Vec<String>,
-    pub idx: HashMap<String, u32>,
+    pub shuffle: Vec<Fruit>,
+    pub idx: HashMap<Fruit, u32>,
 }

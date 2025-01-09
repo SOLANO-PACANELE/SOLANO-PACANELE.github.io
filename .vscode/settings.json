@@ -3,8 +3,14 @@
     // "rust-analyzer.cargo.extraArgs": ["--target-dir", "target_rust_analyzer"],  # cannot be used multiple times
     "rust-analyzer.linkedProjects": [
         "pacanele2/Cargo.toml",
+        "pacanele2_client/Cargo.toml",
         "frontend/Cargo.toml",
         "rules/Cargo.toml",
+    ],
+    "rust-analyzer.cargo.features": [
+        // "rules/generate",
+        // "rules/constructors",
+        // "web_pacanele/server",
     ],
     "rust-analyzer.statusBar.documentSelector": [
         {

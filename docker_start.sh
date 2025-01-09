@@ -1,5 +1,7 @@
 #!/bin/bash
 set -ex
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
 export MSYS_NO_PATHCONV=1
 export MSYS2_ARG_CONV_EXCL="*"
 export MSYS_NO_PATHCONV=1
@@ -13,7 +15,8 @@ docker run \
     -w "/app" \
     -v "$PWD/:/app" \
     -v solana_cargo_target:/docker/cargo_target \
-    johnnysmitherson/pacanele:local_build
+    -v pacanele2_client_target:/pacanele2_client_target \
+    johnnysmitherson/pacanele:base
     # solanalabs/solana:v1.18.26
 
 sleep 2

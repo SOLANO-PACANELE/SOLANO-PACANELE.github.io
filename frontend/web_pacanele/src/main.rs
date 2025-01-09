@@ -3,22 +3,24 @@ use std::{collections::HashMap};
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
-use rules::rule_set::RuleSet;
+use rules::{rule_set::RuleSet, Fruit};
 use web_pacanele::{
     audio::{make_audio_loop_coroutine, send_audio_event, AudioEvent},
-    fruit_list::get_all_fruits,
     gen_css::{make_animation_string, make_transform_string},
     random::{get_wheel_results, get_wheel_shuffle},
     state::{PcnlState, PcnlWheelState, ShuffleState, WheelShuffleState, WheelStage},
     time::{get_current_ts, sleep},
 };
 
+use web_pacanele::client::SolanaDemo;
+
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
 enum Route {
     #[route("/")]
     Pacanele {},
-
+    #[route("/demo")]
+    SolanaDemo {}
 }
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
@@ -33,8 +35,8 @@ fn App() -> Element {
     rsx! {
         document::Link { rel: "icon", href: FAVICON }
         document::Link { rel: "stylesheet", href: MAIN_CSS }
-        document::Style { {make_animation_string("spin_1", get_all_fruits().len() as u32)} }
-        document::Style { {make_animation_string("spin_2", get_all_fruits().len() as u32)} }
+        document::Style { {make_animation_string("spin_1", Fruit::all().len() as u32)} }
+        document::Style { {make_animation_string("spin_2", Fruit::all().len() as u32)} }
         Router::<Route> {}
     }
 }
@@ -68,10 +70,10 @@ fn Pacanele() -> Element {
             let shuf_idx = shuffle
                 .iter()
                 .enumerate()
-                .map(|(i, x)| (x.clone(), i as u32))
-                .collect::<HashMap<String, u32>>();
+                .map(|(i, x)| (*x, i as u32))
+                .collect::<HashMap<Fruit, u32>>();
 
-            let init_fruit = get_all_fruits()[0].clone();
+            let init_fruit = Fruit::all()[0];
             let init_idx = shuf_idx[&init_fruit];
             v2.push(WheelShuffleState {
                 pcnl_id: i,
@@ -92,7 +94,7 @@ fn Pacanele() -> Element {
                 rotations_diff: 0.0,
             });
         }
-        pcnl_state.set(Some(PcnlState { wheels: v, money: 0, last_win: None }));
+        pcnl_state.set(Some(PcnlState { wheels: v, money: 0, last_win: None, last_messages: vec![] }));
         shuf_state.set(Some(ShuffleState { wheels: v2 }));
         info!("init state done");
     });
@@ -137,10 +139,10 @@ fn Pacanele() -> Element {
 
 #[component]
 fn DisplayWinCombo() -> Element {
-    let r =  RuleSet::default_rule_set().rewards();
+    let r =  RuleSet::default_internal_deserialize().rewards();
     let mut r =r.iter().filter(|x| {
         *x.1 > 0
-    }).map(|x| ((x.0.0.to_string(), x.0.1), *x.1)).collect::<Vec<_>>();
+    }).map(|x| ((x.0.0.to_link_str(), x.0.1), *x.1)).collect::<Vec<_>>();
     r.sort_by_key(|a| {
         -(a.1 as i32) - a.0.1 as i32
     });
@@ -201,7 +203,7 @@ pub fn Autoplay(enable_autoplay: Signal<bool>) -> Element {
 
 #[component]
 fn Win(pcnl_state:  Signal<Option<PcnlState>>,) -> Element {
-    if let Some(r) = pcnl_state.read().as_ref() {
+    let win_box = if let Some(r) = pcnl_state.read().as_ref() {
         if let Some(w) = r.last_win {
             rsx! {
                 h1 {
@@ -215,7 +217,30 @@ fn Win(pcnl_state:  Signal<Option<PcnlState>>,) -> Element {
         }
     } else {
         rsx!{}
+    };
+
+    let msg_box = if let Some(r) = pcnl_state.read().as_ref() {
+        let s = r.last_messages.join("\n");
+        rsx! {pre {"{s}"}}
+    } else {
+        rsx!{}
+    };
+
+    rsx! {
+        div {
+            style: "display: flex",
+            div {
+                style:"border: 1px solid red; width: 50cqw; height: 100cqh;",
+                {win_box}
+            }
+            div {
+                style:"border: 1px solid red; width: 50cqw; height: 100cqh;",
+                {msg_box}
+            }
+
+        }
     }
+
 
 }
 
@@ -277,6 +302,7 @@ fn SpinButton(
                 }
                 state.money -= 1;
                 state.last_win = None;
+                state.last_messages = vec![];
                 // Start spin. we do not yet have spin results (can take 5-10s on chain),
                 // so we spin in place from the starting position a whole (integer) number of spins.
                 let spin_time = get_current_ts();
@@ -294,12 +320,16 @@ fn SpinButton(
                 pcnl_state.set(Some(state.clone()));
                 send_audio_event(AudioEvent::StartSpin);
         
-                let Ok((new_results, new_reward)) = get_wheel_results(pcnl_count).await else {
-                    info!("server_wheel_resutls spin error");
-                    continue;
-                };
+                // let Ok((new_results, new_reward)) = get_wheel_results(pcnl_count).await else {
+                //     info!("server_wheel_resutls spin error");
+                //     continue;
+                // };
+                let ((new_results, new_reward), log_messages) = web_pacanele::client::get_spin_result_from_solana().await;
                 assert!(new_results.len() == state.wheels.len());
                 send_audio_event(AudioEvent::HaveResults);
+                if let Some(x) = pcnl_state.write().as_mut() {
+                    x.last_messages = log_messages;
+                }
         
                 // now that we have the results, we can diverge into each wheel
                 let mut _fut = vec![];
@@ -407,7 +437,7 @@ struct WheelSequenceInfo {
 fn compute_wheel_sequences(
     state: &PcnlState,
     shuf: &ShuffleState,
-    new_results: Vec<String>,
+    new_results: Vec<rules::Fruit>,
     spin_time: f64,
 ) -> Vec<WheelSequenceInfo> {
     let mut v: Vec<WheelSequenceInfo> = new_results
@@ -521,7 +551,7 @@ fn SlotWheelInner(state: ReadOnlySignal<Option<(PcnlWheelState, WheelShuffleStat
         rsx! {
             for (i , fruct) in shuffle.shuffle.iter().enumerate() {
                 SlotImage {
-                    pic_name: fruct.clone(),
+                    pic_name: fruct.to_link_str(),
                     pic_pos: i as u32,
                     pic_count: shuffle.shuffle.len() as u32,
                     state: state.clone(),

@@ -26,9 +26,11 @@ web-sys = {version="0.3.76", features = [
   "OscillatorNode",
   "OscillatorType",
 ]}
-rules = {path = "../../rules"}
+rules = {path = "../../rules", features=["generate", "constructors"]}
+pacanele2_client = {path = "../../pacanele2_client", features=["js"]}
 futures = "0.3.31"
 futures-util = "0.3.31"
+bincode = "1.3.3"
 
 [features]
 # default = ["web", "server"]

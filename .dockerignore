@@ -8,5 +8,6 @@ test-ledger
 target_rust_analyzer
 pacanele2/target
 pacanele2/target_rust_analyzer
+pacanele2/target_docker
 frontend/target
 frontend/target_rust_analyzer

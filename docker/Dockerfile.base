@@ -87,19 +87,3 @@ RUN cd /docker/validator && nohup bash -c \
      )"
 
 WORKDIR /app
-
-
-# DOES NOT FUCKING WORK MOVING THESE, ANCHOR IS HARD-CODED
-RUN mkdir -p /docker/cargo_target
-# ENV NPM_CONFIG_PREFIX=/docker/node_modules
-ENV CARGO_TARGET_DIR=/docker/cargo_target
-
-ADD pacanele2 /docker/pacanele2_build_init
-RUN cd /docker/pacanele2_build_init && cargo build-sbf && cargo test-sbf 
-RUN bash -c \
-"set -ex; ( cd /docker/validator ; while true; do solana-test-validator  || sleep 3; done ) & \
- ( sleep 5 \
-    && until solana ping --count 1; do sleep 3; done \
-   && ( cd /docker/pacanele2_build_init && solana program deploy ${CARGO_TARGET_DIR}/deploy/pacanele2.so ) )"
-
-VOLUME /docker/cargo_target
