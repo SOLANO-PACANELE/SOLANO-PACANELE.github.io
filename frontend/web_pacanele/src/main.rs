@@ -318,8 +318,9 @@ fn SpinButton(
                     w.old_idx = w.new_idx;
                 }
                 pcnl_state.set(Some(state.clone()));
+                sleep(0.01).await;
                 send_audio_event(AudioEvent::StartSpin);
-        
+                sleep(0.01).await;
                 // let Ok((new_results, new_reward)) = get_wheel_results(pcnl_count).await else {
                 //     info!("server_wheel_resutls spin error");
                 //     continue;
@@ -355,23 +356,26 @@ fn SpinButton(
                     while !*wheels_ready.peek() {
                         sleep(0.1).await;
                     }
-                    sleep(0.4).await;
-                    send_audio_event(AudioEvent::WheelsFinished);
+                    sleep(0.35).await;
+                    // send_audio_event(AudioEvent::WheelsFinished);
                     if let Some(x) = pcnl_state.write().as_mut() {
                         x.money += new_reward  as u64;
                         x.last_win = if new_reward > 0 {Some(new_reward)} else {None};
+                    }
+                    sleep(0.08).await;
+                    if new_reward > 0 {
+                        for i in  0..new_reward.clamp(0, 7) 
+                        {
+                            send_audio_event(AudioEvent::Win{win_id: i});
+                            sleep(0.40 - 0.05 * i as f64).await;
+                        }
                     }
                     
                     sleep(0.1).await;
                     send_audio_event(AudioEvent::StopAudio);
                     sleep(0.1).await;
                     effects_running.set(false);
-        
-                    sleep(0.2).await;
                     if * enable_autoplay.peek() {
-                        if new_reward > 0 {
-                            sleep(1.5).await;
-                        }
                         do_auto_respin.set(true);
                     }
                 });

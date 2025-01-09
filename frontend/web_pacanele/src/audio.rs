@@ -13,6 +13,7 @@ pub enum AudioEvent {
     HaveResults,
     WheelStop { wheel_id: u32, pcnl_count: u32 },
     WheelsFinished,
+    Win {win_id: u16},
     StopAudio,
 }
 
