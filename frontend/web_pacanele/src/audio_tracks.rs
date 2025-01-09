@@ -72,7 +72,7 @@ fn sound_track_1(info: SoundSequenceInfo, prev: SoundTrackOutput) -> SoundTrackO
 
 fn sound_track_2(info: SoundSequenceInfo, _prev: SoundTrackOutput) -> SoundTrackOutput {
     let gain = match info.last_event {
-        AudioEvent::WheelStop { .. } | AudioEvent::Win {..} => {
+        AudioEvent::WheelStop { .. } => {
             if info.time_since_event < 0.2 {
                 0.7
             } else if info.time_since_event < 0.4 {
@@ -81,6 +81,7 @@ fn sound_track_2(info: SoundSequenceInfo, _prev: SoundTrackOutput) -> SoundTrack
                 0.0
             }
         }
+    |   AudioEvent::Win {..} => 0.8,
    
         _ => 0.0,
     } as f32;

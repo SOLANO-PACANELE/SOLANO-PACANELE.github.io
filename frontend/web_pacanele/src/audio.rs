@@ -40,6 +40,9 @@ pub fn make_audio_loop_coroutine() {
         let mut ding_id = 0;
 
         let mut last_outputs = vec![SoundTrackOutput::default(); TRACKS.len()];
+        const INTERVAL_TIME: f64 = 0.11;
+        const SWIPE_COUNT: u64 = 4;
+        const FRACT_NEXT_PREV : f64 = 1.0 / (SWIPE_COUNT as f64 - 1.0);
         loop {
             ding_id += 1;
             if let Ok(Some(event)) = _rx.try_next() {
@@ -63,19 +66,42 @@ pub fn make_audio_loop_coroutine() {
                     time_since_event: (get_current_ts() - last_event_time).max(0.0001),
                 };
 
+                // create sound plan: (old,new) for each thing
+                let mut sound_plan = vec![];
                 for ((_fn, _last_output), _fm) in
                     (TRACKS.iter().zip(last_outputs.iter_mut())).zip(fms.v.iter_mut())
                 {
-                    *_last_output = _fn(sequence_info, *_last_output);
-                    _fm.set_gain(_last_output.gain.clamp(0.0, 1.0) * audio_settings.peek().volume.clamp(0.0,1.0) as f32);
-                    _fm.set_note(_last_output.note.clamp(20,127));
-                    _fm.set_fm_amount(_last_output.fm_amount.clamp(0.0,1.0));
-                    _fm.set_fm_frequency(_last_output.fm_freq.clamp(0.0,1.0));
+                    let old_output = *_last_output;
+                    let mut new_output =  _fn(sequence_info, *_last_output);
+                    new_output.gain = new_output.gain.clamp(0.0, 1.0) * audio_settings.peek().volume.clamp(0.0,1.0) as f32;
+                    new_output.note = new_output.note.clamp(20,127);
+                    new_output.fm_amount = new_output.fm_amount.clamp(0.0, 1.0);
+                    new_output.fm_freq = new_output.fm_freq.clamp(0.0,1.0);
+                    *_last_output = new_output;
+                    sound_plan.push((old_output, new_output));
+
+                }
+
+                for _i in 0..SWIPE_COUNT {
+                    for ((old, new), _fm) in sound_plan.iter().cloned().zip(fms.v.iter_mut()) {
+                        let fract = (FRACT_NEXT_PREV as f32 * _i  as f32).clamp(0.0, 1.0);
+
+                        let gain = new.gain * fract + old.gain * (1.0 - fract);
+                        // let note = (new.note as f32 * fract + old.note as f32 * (1.0 - fract)).round() as u8;
+                        let fm_am = new.fm_amount  * fract + old.fm_amount * (1.0 - fract);
+                        let fm_fr = new.fm_freq* fract + old.fm_freq * (1.0 - fract);
+
+                        _fm.set_gain(gain);
+                        _fm.set_note(new.note);
+                        _fm.set_fm_amount(fm_am);
+                        _fm.set_fm_frequency(fm_fr);
+                    }
+                    sleep(INTERVAL_TIME / SWIPE_COUNT as f64).await;
                 }
             } else {
                 // no oscillators = no audio
+                sleep(INTERVAL_TIME).await;
             }
-            sleep(0.11).await;
         }
     });
     let tx: UnboundedSender<AudioEvent> = co.tx();
