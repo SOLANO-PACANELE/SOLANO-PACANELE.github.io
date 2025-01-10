@@ -1,11 +1,7 @@
-
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
 use rules::Fruit;
-use web_pacanele::{
-    audio::init_make_audio_loop_coroutine,
-    gen_css::make_animation_string,
-};
+use web_pacanele::{audio::init_make_audio_loop_coroutine, gen_css::make_animation_string};
 
 use web_pacanele::client::SolanaDemo;
 use web_pacanele::pacanele::Pacanele;

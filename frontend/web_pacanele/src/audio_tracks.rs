@@ -99,7 +99,7 @@ fn sound_track_2(info: SoundSequenceInfo, _prev: SoundTrackOutput) -> SoundTrack
 
     let note = match info.last_event {
         AudioEvent::WheelStop { wheel_id, .. } => 72 + wheel_id as u8,
-        AudioEvent::Win { win_id } => 72 + 3 + (win_id%36) as u8,
+        AudioEvent::Win { win_id } => 72 + 3 + (win_id % 36) as u8,
         _ => 0,
     };
 

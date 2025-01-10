@@ -5,8 +5,8 @@ use rules::Fruit;
 pub async fn get_wheel_results(pcnl_count: u32) -> Result<(Vec<rules::Fruit>, u16), ServerFnError> {
     assert!(pcnl_count == 3);
 
-    use rules::generated_rules::*;
     use dioxus_logger::tracing::info;
+    use rules::generated_rules::*;
     let (result, reward) = rules::rule_set::RuleSet::p96().play_random();
     info!("{result:?} => {reward}");
 
@@ -15,8 +15,8 @@ pub async fn get_wheel_results(pcnl_count: u32) -> Result<(Vec<rules::Fruit>, u1
 
 #[cfg(feature = "server")]
 async fn _wait_random(min_s: f64, max_s: f64) {
-    use tokio::task::spawn_blocking;
     use rand::thread_rng;
+    use tokio::task::spawn_blocking;
     tokio::time::sleep(
         spawn_blocking(move || {
             let mut r = thread_rng();

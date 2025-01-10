@@ -1,4 +1,3 @@
-
 use crate::rule_set::RuleSet;
 use crate::Fruit;
 use std::collections::BTreeMap;

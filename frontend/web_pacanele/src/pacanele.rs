@@ -7,7 +7,8 @@ use crate::{
     gen_css::make_transform_string,
     random::get_wheel_shuffle,
     state::{PcnlState, PcnlWheelState, ShuffleState, WheelShuffleState, WheelStage},
-    time::{get_current_ts, sleep}, wallet::{wallet_signals, CurrentWalletDropdown},
+    time::{get_current_ts, sleep},
+    wallet::{wallet_signals, CurrentWalletDropdown},
 };
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
@@ -289,7 +290,7 @@ fn SpinButton(
                 //     info!("server_wheel_resutls spin error");
                 //     continue;
                 // };
-                let keypair = if let Some( keypair ) = wallet.current_keypair.peek().as_ref() {
+                let keypair = if let Some(keypair) = wallet.current_keypair.peek().as_ref() {
                     keypair.insecure_clone()
                 } else {
                     info!("PCNL FAIL!!!");

@@ -1,4 +1,3 @@
-
 use std::collections::HashMap;
 
 use dioxus::prelude::*;
@@ -10,11 +9,10 @@ use pacanele2_client::Pubkey;
 use pacanele2_client::Signer;
 use pacanele2_client::CREDIT_IN_LAMPORTS;
 
-
 #[derive(Clone, Debug, Copy)]
-pub struct WalletSignals{
+pub struct WalletSignals {
     pub current_wallet: Signal<Option<Pubkey>>,
-    pub all_wallets:  Signal<Vec<SerializedKeypair>>,
+    pub all_wallets: Signal<Vec<SerializedKeypair>>,
     pub all_wallets_pk: Signal<Vec<Pubkey>>,
     pub current_keypair: Signal<Option<Keypair>>,
     pub current_sol: Signal<f64>,
@@ -24,27 +22,30 @@ pub struct WalletSignals{
     pub current_credit: Signal<i64>,
 }
 
-
-pub fn init_make_wallet_selector()  {
+pub fn init_make_wallet_selector() {
     info!("init_make_wallet_selector");
 
     let mut current_wallet: Signal<Option<Pubkey>> = dioxus_sdk::storage::use_synced_storage::<
-    dioxus_sdk::storage::LocalStorage,
-    Option<Pubkey>,
->("current_wallet_pubkey".to_string(), || None);
+        dioxus_sdk::storage::LocalStorage,
+        Option<Pubkey>,
+    >(
+        "current_wallet_pubkey".to_string(), || None
+    );
 
     let all_wallets = dioxus_sdk::storage::use_synced_storage::<
-    dioxus_sdk::storage::LocalStorage,
-    Vec<SerializedKeypair>,
->("wallet_keypairs".to_string(), || vec![]);
+        dioxus_sdk::storage::LocalStorage,
+        Vec<SerializedKeypair>,
+    >("wallet_keypairs".to_string(), || vec![]);
 
     let mut current_keypair = use_signal(|| None);
     use_effect(move || {
         if let Some(w_pk) = current_wallet.read().as_ref() {
             info!("current_keypair() : have account = {}", w_pk);
-            let w0 =  all_wallets;
-            let v = w0.peek()
-                .iter().cloned()
+            let w0 = all_wallets;
+            let v = w0
+                .peek()
+                .iter()
+                .cloned()
                 .map(|k| k.keypair())
                 .filter(|k| k.pubkey() == *w_pk)
                 .collect::<Vec<_>>();
@@ -52,24 +53,21 @@ pub fn init_make_wallet_selector()  {
                 return;
             }
             info!("current_keypair() : have keypairs: {}", v.len());
-            let sender  = v.into_iter().next().unwrap();
+            let sender = v.into_iter().next().unwrap();
             current_keypair.set(Some(sender));
         }
     });
 
     let mut wallet_balance: Resource<HashMap<Pubkey, Option<Account>>> = use_resource(move || {
-
         let all_wallets = all_wallets.read().clone();
-        
+
         async move {
             info!("wallet_balance()");
             let client = pacanele2_client::get_client().await;
             let mut hash = HashMap::<Pubkey, Option<Account>>::new();
-            for w in  all_wallets.iter() 
-            {
+            for w in all_wallets.iter() {
                 let w = w.keypair().pubkey();
-                hash.insert(
-                    w, client.get_account(&w).await.ok());
+                hash.insert(w, client.get_account(&w).await.ok());
             }
             hash
         }
@@ -84,7 +82,7 @@ pub fn init_make_wallet_selector()  {
             if let Some(hash) = w2.as_ref() {
                 if let Some(Some(acc)) = hash.get(&key) {
                     let val = acc.lamports as f64 / 1000000000.0;
-                    current_sol.set( val);
+                    current_sol.set(val);
                     info!("current sol = {}", val);
                 } else {
                     current_sol.set(0.0);
@@ -100,19 +98,19 @@ pub fn init_make_wallet_selector()  {
     use_effect(move || {
         info!("all_wallets()");
         let w = all_wallets
-            .read().iter()
+            .read()
+            .iter()
             .map(|k| k.keypair().pubkey())
             .collect::<Vec<_>>();
         all_wallets_pk.set(w);
     });
 
-
-    let do_refresh_values= Callback::new(move |_| {
+    let do_refresh_values = Callback::new(move |_| {
         info!("wallet do refresh values!");
         wallet_balance.restart();
     });
 
-    let set_current_wallet = Callback::new( move |x_| {
+    let set_current_wallet = Callback::new(move |x_| {
         current_wallet.set(x_);
         do_refresh_values.call(());
     });
@@ -125,7 +123,17 @@ pub fn init_make_wallet_selector()  {
         current_credit.set(credit);
     });
 
-    use_context_provider(move || WalletSignals{current_credit, current_wallet, all_wallets, current_keypair, current_sol, all_wallets_pk, wallet_balance, set_current_wallet, do_refresh_values});
+    use_context_provider(move || WalletSignals {
+        current_credit,
+        current_wallet,
+        all_wallets,
+        current_keypair,
+        current_sol,
+        all_wallets_pk,
+        wallet_balance,
+        set_current_wallet,
+        do_refresh_values,
+    });
 }
 
 pub fn wallet_signals() -> WalletSignals {
@@ -144,7 +152,6 @@ pub fn CurrentWalletDropdown() -> Element {
         value
     };
 
-
     rsx! {
         div {
             style: "display:flex;  align-items: center;",
@@ -161,7 +168,7 @@ pub fn CurrentWalletDropdown() -> Element {
                     let val = ev_to_data(_ev);
                     w.set_current_wallet.call(Pubkey::from_str(&val).ok());
                 },
-    
+
                 for pubkey in w.all_wallets_pk.read().iter() {
                     option {
                         value: "{pubkey}",
@@ -176,7 +183,7 @@ pub fn CurrentWalletDropdown() -> Element {
                             } else {
                                 None
                             })
-                        } , 
+                        } ,
                         "SOL"
                     }
                 }
@@ -194,10 +201,9 @@ pub fn CurrentWalletDropdown() -> Element {
         //   <option value="saab">Saab</option>
         //   <option value="mercedes">Mercedes</option>
         //   <option value="audi">Audi</option>
-        // </select> 
+        // </select>
     }
 }
-
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct SerializedKeypair(Vec<u8>);
@@ -381,7 +387,6 @@ fn DisplayCurrentWallet(account: Pubkey) -> Element {
             }
         }
     }
-
 }
 
 #[component]
