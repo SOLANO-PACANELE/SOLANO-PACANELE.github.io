@@ -88,11 +88,12 @@ pub fn make_audio_loop_coroutine() {
 
                         let gain = new.gain * fract + old.gain * (1.0 - fract);
                         // let note = (new.note as f32 * fract + old.note as f32 * (1.0 - fract)).round() as u8;
+                        let note = new.note;
                         let fm_am = new.fm_amount  * fract + old.fm_amount * (1.0 - fract);
                         let fm_fr = new.fm_freq* fract + old.fm_freq * (1.0 - fract);
 
                         _fm.set_gain(gain);
-                        _fm.set_note(new.note);
+                        _fm.set_note(note);
                         _fm.set_fm_amount(fm_am);
                         _fm.set_fm_frequency(fm_fr);
                     }

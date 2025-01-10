@@ -2631,6 +2631,8 @@ name = "pacanele2"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
  "rules",
  "solana-client",
  "solana-program",

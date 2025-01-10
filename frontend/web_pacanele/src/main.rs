@@ -13,6 +13,7 @@ use web_pacanele::{
 };
 
 use web_pacanele::client::SolanaDemo;
+use web_pacanele::wallet::WalletDashboard;
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
@@ -20,7 +21,9 @@ enum Route {
     #[route("/")]
     Pacanele {},
     #[route("/demo")]
-    SolanaDemo {}
+    SolanaDemo {},
+    #[route("/wallet")]
+    WalletDashboard {}
 }
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
@@ -45,9 +48,9 @@ fn random_spin_period(on_autoplay: bool) -> f64 {
     let mut r = rand::thread_rng();
     use rand::Rng;
     if on_autoplay {
-        r.gen_range(0.2..0.5)
+        r.gen_range(0.4..0.7)
     } else {
-        r.gen_range(1.6..2.6)
+        r.gen_range(0.9..1.6)
     }
 }
 

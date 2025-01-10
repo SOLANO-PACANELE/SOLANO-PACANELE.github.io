@@ -1,4 +1,5 @@
 use base64::Engine;
+use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::transaction::VersionedTransaction;
 use wasm_client_solana::solana_transaction_status::UiTransactionReturnData;
 use solana_sdk::transaction_context::TransactionReturnData;
@@ -30,8 +31,19 @@ pub fn get_program_address() -> Pubkey {
     program_id
 }
 
+pub fn get_bank_address() -> Pubkey {
+    let program_id = get_program_address();
+    let seed = b"bank";
+    Pubkey::find_program_address(&[seed], &program_id).0
+}
+
+
+pub fn get_solana_rpc_url() -> String {
+    String::from("http://127.0.0.1:8899")
+}
+
 pub async fn get_client() -> RpcClient {
-        let rpc_url = String::from("http://127.0.0.1:8899");
+        let rpc_url =get_solana_rpc_url();
         let client = RpcClient::new_with_commitment(&rpc_url, CommitmentConfig::confirmed());
         ;
         client
@@ -72,18 +84,28 @@ pub async fn get_tx_meta( client: &RpcClient,signature: &Signature,) -> UiTransa
     transaction.transaction.meta.unwrap()
 }
 
+pub async fn run_transaction(client: &RpcClient, payer: Keypair, instructions: &[Instruction]) -> Result<UiTransactionStatusMeta, String> {
 
-pub async fn demo() -> Result<UiTransactionStatusMeta, String> {
+        // Add the instruction to new transaction
+        let mut transaction = Transaction::new_with_payer(instructions, Some(&payer.pubkey()));
+        transaction.sign(&[&payer], client.get_latest_blockhash().await.unwrap());
+        let vt : VersionedTransaction = transaction.into();
+    
+        // Send and confirm the transaction
+        let signature = match client.send_and_confirm_transaction(&vt).await {
+            Ok(signature) => signature,
+            Err(err) => {
+                return Err(format!("! Error sending transaction:\n {}", err));
+            }
+        };
+    
+        Ok(get_tx_meta(&client, &signature).await)
+}
+
+pub async fn spin_pcnl(client: &RpcClient, payer: Keypair) -> Result<UiTransactionStatusMeta, String> {
     let program_id = get_program_address();
-    let client = get_client().await;
 
-    // Generate a new keypair for the payer
-    let payer = create_new_keypair();
-
-    request_airdrop( &client, &payer.pubkey(), 1).await;
-
-    // Create the instruction
-    let instruction = Instruction::new_with_bytes(
+    let instruction_spin_pcnl = Instruction::new_with_bytes(
         program_id,
         &[], // Empty instruction data
         // account data
@@ -94,23 +116,53 @@ pub async fn demo() -> Result<UiTransactionStatusMeta, String> {
                 is_signer: false,
                 is_writable: false,
             },
+            // 2nd account = bank
+            AccountMeta {
+                pubkey: get_bank_address(),
+                is_signer: false,
+                is_writable: true,
+            },
+            // 3rd account = player
+            AccountMeta {
+                pubkey: payer.pubkey(),
+                is_signer: true,
+                is_writable: true,
+            },
+            // 4th account = system program
+            AccountMeta {
+                pubkey: solana_sdk::system_program::id(),
+                is_signer: false,
+                is_writable: false,
+            }
         ],
     );
+    
+     run_transaction(&client, payer, &[
+        ComputeBudgetInstruction::set_compute_unit_limit(77777+300),
+        ComputeBudgetInstruction::set_compute_unit_price(1),
+        instruction_spin_pcnl,
+    ]).await
+}
 
-    // Add the instruction to new transaction
-    let mut transaction = Transaction::new_with_payer(&[instruction], Some(&payer.pubkey()));
-    transaction.sign(&[&payer], client.get_latest_blockhash().await.unwrap());
-    let vt : VersionedTransaction = transaction.into();
+pub async fn send_money(client: &RpcClient, payer: Keypair, target: Pubkey, lamports: u64) ->  Result<UiTransactionStatusMeta, String> {
+    let send_solana = solana_sdk::system_instruction::transfer(&payer.pubkey(), &target, lamports);
 
-    // Send and confirm the transaction
-    let signature = match client.send_and_confirm_transaction(&vt).await {
-        Ok(signature) => signature,
-        Err(err) => {
-            return Err(format!("! Error sending transaction:\n {}", err));
-        }
-    };
+    run_transaction(client, payer, &[
+        ComputeBudgetInstruction::set_compute_unit_limit(77777+300),
+        ComputeBudgetInstruction::set_compute_unit_price(1),
+        send_solana,
+    ]).await
+}
 
-    Ok(get_tx_meta(&client, &signature).await)
+pub async fn demo() -> Result<UiTransactionStatusMeta, String> {
+    let client = get_client().await;
+
+    // Generate a new keypair for the payer
+    let payer = create_new_keypair();
+
+    request_airdrop( &client, &payer.pubkey(), 1).await;
+
+    spin_pcnl(&client, payer).await
 }
 
 pub fn base64_decode_return(r: &UiTransactionStatusMeta) -> Vec<u8> {

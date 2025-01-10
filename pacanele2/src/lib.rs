@@ -12,26 +12,41 @@ use solana_program::program::set_return_data;
 
 entrypoint!(process_instruction);
 
+const CREDIT_IN_LAMPORTS: u64 = 405694;
+
 pub fn process_instruction(
     _program_id: &Pubkey,
     _accounts: &[AccountInfo],
     _instruction_data: &[u8],
 ) -> ProgramResult {
-    
+    // extract accounts
     let accounts_iter = &mut _accounts.iter();
     let sysvar_slot_history = next_account_info(accounts_iter)?;
-    let not_random = not_really_random(sysvar_slot_history)?.to_le_bytes();
-    msg!("NOT_RANDOM {:?}", not_random);
-    let var_a = u16::from_le_bytes([not_random[0], not_random[1]]);
-    let var_b = u16::from_le_bytes([not_random[2], not_random[3]]);
-    let var_c = u16::from_le_bytes([not_random[4], not_random[5]]);
-    let var_d = u16::from_le_bytes([not_random[6], not_random[7]]);
+    let bank_account = next_account_info(accounts_iter)?;
+    let player_account = next_account_info(accounts_iter)?;
+    let system_program = next_account_info(accounts_iter)?;
 
-    // let r = RuleSet::default_rule_set();
-    // use rules::generated_rules::*;
+    // send credits to bank account
+    let insert_coin_instruction = solana_program::system_instruction::transfer(player_account.key, bank_account.key, CREDIT_IN_LAMPORTS);
+
+    solana_program::program::invoke(&insert_coin_instruction, &[
+        player_account.to_owned(), bank_account.to_owned(), system_program.to_owned(),
+    ])?;
+
+    // compute funny random
+    let not_random = not_really_random(sysvar_slot_history, 0)?;
+    msg!("\n{:?}\n{:?}", &not_random[0..16], &not_random[16..32]);
+
+    // compute banana seed
+    use rand_chacha::ChaCha8Rng;
+    use rand_chacha::rand_core::SeedableRng;
+    use rand::Rng;
+    let mut chacha = ChaCha8Rng::from_seed(not_random);
+    let seed = chacha.gen();
+
+    // compute banana
     let r = rules::rule_set::RuleSet::p96();
-    
-    let rv = r.play_random_from_seed([var_a, var_b, var_c^var_d]);
+    let rv = r.play_random_from_seed(seed);
     msg!("RESULT: {:?}", rv);
     let rv = bincode::serialize(&rv).unwrap();
     set_return_data(&rv);
@@ -39,21 +54,21 @@ pub fn process_instruction(
     Ok(())
 }
 
-fn not_really_random(sysvar_slot_history: &AccountInfo) -> Result<u64, ProgramError> {
-    let clock = {
-        let clock = Clock::get()?;
-        let a = clock.slot;
-        let b = clock.unix_timestamp;
-        let c = clock.epoch_start_timestamp;
-        a ^ b as u64 ^ c as u64
-    };
-
-    let recent = get_recent_block_hashes(sysvar_slot_history)?;
-
-    Ok(clock^recent)
+fn not_really_random(sysvar_slot_history: &AccountInfo, nonce: u64) -> Result<[u8;32], ProgramError> {
+    let a = get_recent_block_hashes(sysvar_slot_history)?;
+    let clock = Clock::get()?;
+    let b = [clock.slot, clock.unix_timestamp as u64, clock.epoch_start_timestamp as u64, nonce];
+    let e = a.iter().zip(b.iter()).map(|(a, b)| (a ^ b).to_le_bytes()).flatten().collect::<Vec<_>>();
+    
+    let mut o = [0; 32];
+    assert!(e.len() == o.len());
+    for i in 0..o.len() {
+        o[i] = e[i];
+    }
+    Ok(o)
 }
 
-pub fn get_recent_block_hashes(sysvar_slot_history: &AccountInfo) -> Result<u64, ProgramError> {
+pub fn get_recent_block_hashes(sysvar_slot_history: &AccountInfo) -> Result<[u64;4], ProgramError> {
     use solana_program::sysvar::slot_history::ProgramError;
 
     /*
@@ -74,9 +89,8 @@ pub fn get_recent_block_hashes(sysvar_slot_history: &AccountInfo) -> Result<u64,
     let v1 = u64::from_le_bytes(data[16..16+8].try_into().unwrap());
     let v2 = u64::from_le_bytes(data[data_len-16..data_len-8].try_into().unwrap());
     let v3 = u64::from_le_bytes(data[data_len/2..data_len/2+8].try_into().unwrap());
-    let x = v1 ^ v2 ^ v3;
-    msg!("recent block hashes: {}", x);
-    Ok(x)
+    let v4 = u64::from_le_bytes(data[data_len/3..data_len/3+8].try_into().unwrap());
+    Ok([v1,v2,v3,v4])
 }
 
 fn print_pacanel(r: &RuleSet, seed: u16) {

@@ -81,7 +81,15 @@ fn sound_track_2(info: SoundSequenceInfo, _prev: SoundTrackOutput) -> SoundTrack
                 0.0
             }
         }
-    |   AudioEvent::Win {..} => 0.8,
+    |   AudioEvent::Win {..} => {
+        if info.time_since_event < 0.2 {
+            0.9
+        } else if info.time_since_event < 0.4 {
+            (0.9 - (info.time_since_event - 0.2) * 2.0).clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
+    },
    
         _ => 0.0,
     } as f32;
