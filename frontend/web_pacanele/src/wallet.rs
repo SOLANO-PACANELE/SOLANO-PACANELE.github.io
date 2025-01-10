@@ -1,16 +1,14 @@
 use std::ops::Deref;
 
 use dioxus::prelude::*;
-use dioxus_logger::tracing::{info, };
+use dioxus_logger::tracing::info;
+use pacanele2_client::FromStr;
+use pacanele2_client::Keypair;
 use pacanele2_client::Pubkey;
 use pacanele2_client::Signer;
-use pacanele2_client::Keypair;
-use pacanele2_client::FromStr;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
-pub struct SerializedKeypair(
-    Vec<u8>,
-);
+pub struct SerializedKeypair(Vec<u8>);
 
 impl From<SerializedKeypair> for Keypair {
     fn from(value: SerializedKeypair) -> Self {
@@ -30,10 +28,12 @@ impl SerializedKeypair {
     }
 }
 
-
 #[component]
 pub fn WalletDashboard() -> Element {
-    let accounts = dioxus_sdk::storage::use_synced_storage::<dioxus_sdk::storage::LocalStorage, Vec<SerializedKeypair>>("wallet_keypairs".to_string(), || vec![]);
+    let accounts = dioxus_sdk::storage::use_synced_storage::<
+        dioxus_sdk::storage::LocalStorage,
+        Vec<SerializedKeypair>,
+    >("wallet_keypairs".to_string(), || vec![]);
 
     rsx! {
         PlayerAccountList {accounts}
@@ -41,7 +41,7 @@ pub fn WalletDashboard() -> Element {
 }
 
 #[component]
-fn PlayerAccountList(accounts: Signal<Vec<SerializedKeypair>>)->Element {
+fn PlayerAccountList(accounts: Signal<Vec<SerializedKeypair>>) -> Element {
     let bank_address = pacanele2_client::get_bank_address().0;
     let delete_me = move |account| {
         accounts.write().retain(|k| k.keypair().pubkey() != account);
@@ -49,15 +49,21 @@ fn PlayerAccountList(accounts: Signal<Vec<SerializedKeypair>>)->Element {
 
     let send_money = move |(sender, target, amount)| {
         let accounts = accounts.peek();
-        let v =  accounts.iter().filter(|k| k.keypair().pubkey() == sender).collect::<Vec<_>>();
-        let sender =v.first();
+        let v = accounts
+            .iter()
+            .filter(|k| k.keypair().pubkey() == sender)
+            .collect::<Vec<_>>();
+        let sender = v.first();
         if let Some(sender) = sender {
             let sender = sender.keypair();
             let sender_pub = sender.pubkey();
             spawn(async move {
                 let client = pacanele2_client::get_client().await;
                 let result = pacanele2_client::send_money(&client, sender, target, amount).await;
-                info!("SEND MONEY: FROM={} TO={} AMOUNT={} \n TX={:#?}", sender_pub, target, amount, result);
+                info!(
+                    "SEND MONEY: FROM={} TO={} AMOUNT={} \n TX={:#?}",
+                    sender_pub, target, amount, result
+                );
             });
         }
     };
@@ -96,7 +102,11 @@ fn PlayerAccountList(accounts: Signal<Vec<SerializedKeypair>>)->Element {
 }
 
 #[component]
-fn PlayerAccountDisplay(account: Pubkey, on_forget: Callback<Pubkey>, send_money: Callback<(Pubkey, Pubkey, u64)>) -> Element {
+fn PlayerAccountDisplay(
+    account: Pubkey,
+    on_forget: Callback<Pubkey>,
+    send_money: Callback<(Pubkey, Pubkey, u64)>,
+) -> Element {
     let mut account_info = use_resource(move || async move {
         let cl = pacanele2_client::get_client().await;
         cl.get_account(&account).await
@@ -132,7 +142,7 @@ fn PlayerAccountDisplay(account: Pubkey, on_forget: Callback<Pubkey>, send_money
                     },
                     "refresh"
                 }
-                
+
                 button {
                     onclick: move |_| async move {
                         info!("airdrop {}", account);
@@ -157,7 +167,11 @@ fn PlayerAccountDisplay(account: Pubkey, on_forget: Callback<Pubkey>, send_money
 }
 
 #[component]
-fn PlayerAccountSendMoneyButton(account: Pubkey, refresh_account: Callback<(),()>, send_money: Callback<(Pubkey, Pubkey, u64)>) -> Element {
+fn PlayerAccountSendMoneyButton(
+    account: Pubkey,
+    refresh_account: Callback<(), ()>,
+    send_money: Callback<(Pubkey, Pubkey, u64)>,
+) -> Element {
     let mut target = use_signal(|| "".to_string());
     let mut amount: Signal<String> = use_signal(|| "0".to_string());
 

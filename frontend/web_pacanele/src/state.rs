@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use rules::Fruit;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PcnlState {

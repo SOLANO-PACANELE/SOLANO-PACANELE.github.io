@@ -7,7 +7,7 @@ use rules::Fruit;
 
 #[server]
 pub async fn get_wheel_results(pcnl_count: u32) -> Result<(Vec<rules::Fruit>, u16), ServerFnError> {
-    assert!(pcnl_count==3);
+    assert!(pcnl_count == 3);
 
     use rules::generated_rules::*;
     let (result, reward) = rules::rule_set::RuleSet::p96().play_random();
