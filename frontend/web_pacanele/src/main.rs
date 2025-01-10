@@ -1,6 +1,6 @@
 
 use dioxus::prelude::*;
-use dioxus_logger::tracing::Level;
+use dioxus_logger::tracing::{info, Level};
 use rules::Fruit;
 use web_pacanele::{
     audio::init_make_audio_loop_coroutine,
@@ -27,10 +27,12 @@ const MAIN_CSS: Asset = asset!("/assets/main.css");
 
 fn main() {
     dioxus_logger::init(Level::INFO).expect("logger failed to init");
+    info!("main()");
     dioxus::launch(App);
 }
 #[component]
 fn App() -> Element {
+    info!("App()");
     init_make_audio_loop_coroutine();
     init_make_wallet_selector();
     rsx! {

@@ -4246,6 +4246,7 @@ dependencies = [
  "async-std",
  "base64 0.22.1",
  "solana-sdk",
+ "tracing",
  "wasm_client_solana",
 ]
 

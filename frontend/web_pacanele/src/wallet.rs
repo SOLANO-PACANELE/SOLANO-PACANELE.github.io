@@ -26,6 +26,8 @@ pub struct WalletSignals{
 
 
 pub fn init_make_wallet_selector()  {
+    info!("init_make_wallet_selector");
+
     let mut current_wallet: Signal<Option<Pubkey>> = dioxus_sdk::storage::use_synced_storage::<
     dioxus_sdk::storage::LocalStorage,
     Option<Pubkey>,
@@ -55,17 +57,22 @@ pub fn init_make_wallet_selector()  {
         }
     });
 
-    let mut wallet_balance: Resource<HashMap<Pubkey, Option<Account>>> = use_resource(move || async move {
-        info!("wallet_balance()");
-        let client = pacanele2_client::get_client().await;
-        let mut hash = HashMap::<Pubkey, Option<Account>>::new();
-        for w in  all_wallets.read().iter() 
-        {
-            let w = w.keypair().pubkey();
-            hash.insert(
-                w, client.get_account(&w).await.ok());
+    let mut wallet_balance: Resource<HashMap<Pubkey, Option<Account>>> = use_resource(move || {
+
+        let all_wallets = all_wallets.read().clone();
+        
+        async move {
+            info!("wallet_balance()");
+            let client = pacanele2_client::get_client().await;
+            let mut hash = HashMap::<Pubkey, Option<Account>>::new();
+            for w in  all_wallets.iter() 
+            {
+                let w = w.keypair().pubkey();
+                hash.insert(
+                    w, client.get_account(&w).await.ok());
+            }
+            hash
         }
-        hash
     });
 
     let mut current_sol = use_signal(move || 0.0);
@@ -76,11 +83,16 @@ pub fn init_make_wallet_selector()  {
         if let Some(key) = *current_wallet.read() {
             if let Some(hash) = w2.as_ref() {
                 if let Some(Some(acc)) = hash.get(&key) {
-                    current_sol.set( acc.lamports as f64 / 1000000000.0);
+                    let val = acc.lamports as f64 / 1000000000.0;
+                    current_sol.set( val);
+                    info!("current sol = {}", val);
                 } else {
                     current_sol.set(0.0);
+                    info!("current sol = {}", 0.0);
                 }
             }
+        } else {
+            info!("no current wallet!")
         }
     });
 
@@ -122,7 +134,8 @@ pub fn wallet_signals() -> WalletSignals {
 
 #[component]
 pub fn CurrentWalletDropdown() -> Element {
-    let w = wallet_signals();
+    let w: WalletSignals = wallet_signals();
+    info!("CurrentWalletDropdown");
 
     let ev_to_data = move |_ev: Event<FormData>| -> String {
         // info!("VAL: {_ev:?}");
@@ -209,6 +222,7 @@ impl SerializedKeypair {
 
 #[component]
 pub fn WalletDashboard() -> Element {
+    info!("WalletDashboard()");
     rsx! {
         PlayerAccountList {accounts:wallet_signals().all_wallets}
     }

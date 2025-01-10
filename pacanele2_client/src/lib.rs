@@ -7,6 +7,7 @@ use wasm_client_solana::solana_transaction_status::UiTransactionStatusMeta;
 
 pub use solana_sdk::account::Account;
 
+use wasm_client_solana::RpcSimulateTransactionConfig;
 pub use wasm_client_solana::SolanaRpcClient as RpcClient;
 pub use wasm_client_solana::ClientResult;
 pub use wasm_client_solana::RpcTransactionConfig;
@@ -23,6 +24,8 @@ pub use solana_sdk::{
 // pub use solana_extra_wasm::transaction_status::UiTransactionEncoding;
 pub use wasm_client_solana::solana_transaction_status::UiTransactionEncoding;
 pub use std::str::FromStr;
+
+use tracing::info;
 
 pub const CREDIT_IN_LAMPORTS: u64 = 405694;
 
@@ -67,7 +70,7 @@ pub async fn request_airdrop(client: &RpcClient,target: &Pubkey, sol: u8, ) {
         loop {
             let confirmed = client.confirm_transaction(&signature).await.unwrap();
             if confirmed {
-                eprintln!("AIRDROP OK {} SOL ---> ADDR={}", sol, target);
+                info!("AIRDROP OK {} SOL ---> ADDR={}", sol, target);
                 break;
             }
             async_std::task::sleep(std::time::Duration::from_secs_f64(0.5)).await;
@@ -89,8 +92,36 @@ pub async fn get_tx_meta( client: &RpcClient,signature: &Signature,) -> UiTransa
 
 pub async fn run_transaction(client: &RpcClient, payer: Keypair, instructions: &[Instruction]) -> Result<UiTransactionStatusMeta, String> {
 
-        // Add the instruction to new transaction
-        let mut transaction = Transaction::new_with_payer(instructions, Some(&payer.pubkey()));
+        // estimate compute units consumed by thing
+        let transaction = Transaction::new_with_payer(instructions, Some(&payer.pubkey()));
+        let compute_limit = {
+            let vt : VersionedTransaction = transaction.into();let sim = client.simulate_transaction(&vt).await.map_err(|e| format!("! sim fail: {:?}", e))?;
+            let consumed = sim.value.units_consumed.unwrap_or_default();
+            info!("run transaction simulation: {} units projected.", consumed);
+            let consumed = (consumed + 3000 + (consumed / 4)).clamp(6666, 166666);
+            consumed as u32
+        };
+
+        let priority_fee = {
+            let fees = client.get_recent_prioritization_fees().await.map_err(|e| format!("{}", e))?;
+            if fees.is_empty() {
+                0
+            } else {
+                let fee_sum: u64 = fees.iter().map(|f| f.prioritization_fee).sum();
+                (fee_sum / fees.len() as u64).clamp(0, 5000)
+            }
+        };
+        info!("recent priority fees = {}.", priority_fee);
+
+        // sign real tx with consume limit
+        let mut instructions2 = vec![
+            ComputeBudgetInstruction::set_compute_unit_limit(compute_limit),
+            ComputeBudgetInstruction::set_compute_unit_price(priority_fee),
+        ];
+        for i in instructions {
+            instructions2.push(i.clone());
+        }
+        let mut transaction = Transaction::new_with_payer(&instructions2, Some(&payer.pubkey()));
         transaction.sign(&[&payer], client.get_latest_blockhash().await.unwrap());
         let vt : VersionedTransaction = transaction.into();
     
@@ -141,10 +172,8 @@ pub async fn spin_pcnl(client: &RpcClient, payer: Keypair) -> Result<UiTransacti
             }
         ],
     );
-    
+
      run_transaction(&client, payer, &[
-        ComputeBudgetInstruction::set_compute_unit_limit(77777+300),
-        ComputeBudgetInstruction::set_compute_unit_price(1),
         instruction_spin_pcnl,
     ]).await
 }
@@ -153,14 +182,12 @@ pub async fn send_money(client: &RpcClient, payer: Keypair, target: Pubkey, lamp
     let send_solana = solana_sdk::system_instruction::transfer(&payer.pubkey(), &target, lamports);
 
     run_transaction(client, payer, &[
-        ComputeBudgetInstruction::set_compute_unit_limit(77777+300),
-        ComputeBudgetInstruction::set_compute_unit_price(1),
         send_solana,
     ]).await
 }
 
 
-pub fn base64_decode_return(r: &UiTransactionStatusMeta) -> Vec<u8> {
-    let s = r.return_data.clone().unwrap().data.0;
-    base64::prelude::BASE64_STANDARD.decode(&s).unwrap()
+pub fn base64_decode_return(r: &UiTransactionStatusMeta) -> Result<Vec<u8>, String> {
+    let s = r.return_data.clone().ok_or("no return data!")?.data.0;
+    base64::prelude::BASE64_STANDARD.decode(&s).map_err(|e| format!("base64 decode error: {}", e))
 }

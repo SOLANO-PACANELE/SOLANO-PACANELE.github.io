@@ -345,7 +345,7 @@ fn SpinButton(
                     }
                     sleep(0.15).await;
                     if new_reward > 0 {
-                        for i in 0..new_reward.clamp(0, 7) {
+                        for i in 0..new_reward.clamp(0, 77) {
                             send_audio_event(AudioEvent::Win { win_id: i });
                             sleep((0.40 - 0.05 * i as f64).clamp(0.15, 0.4)).await;
                         }
