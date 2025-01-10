@@ -7,10 +7,11 @@ use crate::{
     gen_css::make_transform_string,
     random::get_wheel_shuffle,
     state::{PcnlState, PcnlWheelState, ShuffleState, WheelShuffleState, WheelStage},
-    time::{get_current_ts, sleep}, wallet::CurrentWalletDropdown,
+    time::{get_current_ts, sleep}, wallet::{wallet_signals, CurrentWalletDropdown},
 };
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
+use pacanele2_client::CREDIT_IN_LAMPORTS;
 use rules::{rule_set::RuleSet, Fruit};
 
 fn random_spin_period(on_autoplay: bool) -> f64 {
@@ -67,20 +68,11 @@ pub fn Pacanele() -> Element {
         }
         pcnl_state.set(Some(PcnlState {
             wheels: v,
-            money: 0,
             last_win: None,
             last_messages: vec![],
         }));
         shuf_state.set(Some(ShuffleState { wheels: v2 }));
         info!("init state done");
-    });
-
-    let credit_string = use_memo(move || {
-        if let Some(p) = pcnl_state.read().as_ref() {
-            format!("credit: {}", p.money)
-        } else {
-            "".to_string()
-        }
     });
 
     rsx! {
@@ -89,10 +81,7 @@ pub fn Pacanele() -> Element {
             Win {pcnl_state}
         }
         div { id: "left-box" ,
-            h1 {
-                style: "font-size: 400%",
-                {credit_string}
-            }
+            DisplayCredit {}
             DisplayWinCombo {}
         }
         div {
@@ -109,6 +98,18 @@ pub fn Pacanele() -> Element {
                 SlotWheelRow { pcnl_state, shuf_state, pcnl_count }
 
             }
+        }
+    }
+}
+
+#[component]
+fn DisplayCredit() -> Element {
+    let wallet = wallet_signals();
+
+    rsx! {
+        h1 {
+            style: "font-size: 400%",
+            "credit: {wallet.current_credit}"
         }
     }
 }
@@ -225,16 +226,10 @@ fn SpinButton(
     enable_autoplay: ReadOnlySignal<bool>,
 ) -> Element {
     info!("SpinButton()");
+    let wallet: crate::wallet::WalletSignals = wallet_signals();
 
     let mut effects_running = use_signal(|| false);
-    let have_money = use_memo(move || {
-        if let Some(s) = pcnl_state.read().as_ref() {
-            let m = s.money;
-            m > 0
-        } else {
-            false
-        }
-    });
+
     let wheels_ready = use_memo(move || {
         if let Some(PcnlState { wheels, .. }) = pcnl_state.read().as_ref() {
             for w in wheels.iter() {
@@ -269,11 +264,7 @@ fn SpinButton(
                     info!("state empty before spin.");
                     continue;
                 };
-                if state.money == 0 {
-                    info!("no money");
-                    continue;
-                }
-                state.money -= 1;
+
                 state.last_win = None;
                 state.last_messages = vec![];
                 // Start spin. we do not yet have spin results (can take 5-10s on chain),
@@ -298,7 +289,21 @@ fn SpinButton(
                 //     info!("server_wheel_resutls spin error");
                 //     continue;
                 // };
-                let ((new_results, new_reward), log_messages) = get_spin_result_from_solana().await;
+                let keypair = if let Some( keypair ) = wallet.current_keypair.peek().as_ref() {
+                    keypair.insecure_clone()
+                } else {
+                    info!("PCNL FAIL!!!");
+                    send_audio_event(AudioEvent::StopAudio);
+                    continue;
+                };
+
+                let res = get_spin_result_from_solana(keypair).await;
+                let Ok(((new_results, new_reward), log_messages)) = res else {
+                    info!("PCNL FAIL!!!");
+                    send_audio_event(AudioEvent::StopAudio);
+                    continue;
+                };
+                wallet.do_refresh_values.call(());
                 assert!(new_results.len() == state.wheels.len());
                 send_audio_event(AudioEvent::HaveResults);
                 if let Some(x) = pcnl_state.write().as_mut() {
@@ -332,7 +337,6 @@ fn SpinButton(
                     sleep(0.15).await;
                     // send_audio_event(AudioEvent::WheelsFinished);
                     if let Some(x) = pcnl_state.write().as_mut() {
-                        x.money += new_reward as u64;
                         x.last_win = if new_reward > 0 {
                             Some(new_reward)
                         } else {
@@ -371,7 +375,7 @@ fn SpinButton(
 
     rsx! {
         {
-            if *wheels_ready.read() && !*effects_running.read() && *have_money.read() {
+            if *wheels_ready.read() && !*effects_running.read() {
                 info!("spin button on");
                 rsx! {
                     button {
@@ -387,22 +391,6 @@ fn SpinButton(
             } else {
                 info!("spin button off");
                 rsx! {}
-            }
-        }
-        {
-            if !*have_money.read() {
-                rsx! {
-                    button {
-                        onclick: move |_ev| {
-                            if let Some(x) = pcnl_state.write().as_mut() {
-                                x.money = 50;
-                            }
-                        },
-                        h1 { "Da si mie 5 lei boss" }
-                    }
-                }
-            } else {
-                rsx!{}
             }
         }
     }

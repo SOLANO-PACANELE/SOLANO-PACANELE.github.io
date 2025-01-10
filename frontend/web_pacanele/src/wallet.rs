@@ -8,17 +8,25 @@ use pacanele2_client::FromStr;
 use pacanele2_client::Keypair;
 use pacanele2_client::Pubkey;
 use pacanele2_client::Signer;
+use pacanele2_client::CREDIT_IN_LAMPORTS;
 
 
 #[derive(Clone, Debug, Copy)]
-struct WalletSelector{
-    current_wallet: Signal<Option<Pubkey>>,
-    all_wallets:  Signal<Vec<SerializedKeypair>>,
+pub struct WalletSignals{
+    pub current_wallet: Signal<Option<Pubkey>>,
+    pub all_wallets:  Signal<Vec<SerializedKeypair>>,
+    pub all_wallets_pk: Signal<Vec<Pubkey>>,
+    pub current_keypair: Signal<Option<Keypair>>,
+    pub current_sol: Signal<f64>,
+    pub wallet_balance: Resource<HashMap<Pubkey, Option<Account>>>,
+    pub set_current_wallet: Callback<Option<Pubkey>>,
+    pub do_refresh_values: Callback<()>,
+    pub current_credit: Signal<i64>,
 }
 
 
-pub fn make_wallet_selector()  {
-    let current_wallet: Signal<Option<Pubkey>> = dioxus_sdk::storage::use_synced_storage::<
+pub fn init_make_wallet_selector()  {
+    let mut current_wallet: Signal<Option<Pubkey>> = dioxus_sdk::storage::use_synced_storage::<
     dioxus_sdk::storage::LocalStorage,
     Option<Pubkey>,
 >("current_wallet_pubkey".to_string(), || None);
@@ -27,61 +35,99 @@ pub fn make_wallet_selector()  {
     dioxus_sdk::storage::LocalStorage,
     Vec<SerializedKeypair>,
 >("wallet_keypairs".to_string(), || vec![]);
-    use_context_provider(move || WalletSelector{current_wallet, all_wallets});
-}
 
-pub fn current_wallet() -> Signal<Option<Pubkey>> {
-    let s = use_context::<WalletSelector>();
-    s.current_wallet
-}
-
-pub fn all_wallets() -> Signal<Vec<SerializedKeypair>> {
-    use_context::<WalletSelector>().all_wallets
-}
-
-#[component]
-pub fn CurrentWalletDropdown() -> Element {
-    let all_wallet_serial = all_wallets();
-    let mut all_wallets = use_signal(move || vec![]);
+    let mut current_keypair = use_signal(|| None);
     use_effect(move || {
-        info!("all_wallets()");
-        let w = all_wallet_serial
-            .read().iter()
-            .map(|k| k.keypair().pubkey())
-            .collect::<Vec<_>>();
-        all_wallets.set(w);
+        if let Some(w_pk) = current_wallet.read().as_ref() {
+            info!("current_keypair() : have account = {}", w_pk);
+            let w0 =  all_wallets;
+            let v = w0.peek()
+                .iter().cloned()
+                .map(|k| k.keypair())
+                .filter(|k| k.pubkey() == *w_pk)
+                .collect::<Vec<_>>();
+            if v.is_empty() {
+                return;
+            }
+            info!("current_keypair() : have keypairs: {}", v.len());
+            let sender  = v.into_iter().next().unwrap();
+            current_keypair.set(Some(sender));
+        }
     });
 
-    let mut current_wallet = current_wallet();
-
-    let wallet_balance = use_resource(move || async move {
+    let mut wallet_balance: Resource<HashMap<Pubkey, Option<Account>>> = use_resource(move || async move {
         info!("wallet_balance()");
         let client = pacanele2_client::get_client().await;
         let mut hash = HashMap::<Pubkey, Option<Account>>::new();
         for w in  all_wallets.read().iter() 
         {
-            hash.insert(*w, client.get_account(w).await.ok());
+            let w = w.keypair().pubkey();
+            hash.insert(
+                w, client.get_account(&w).await.ok());
         }
         hash
     });
 
-    let current_balance = use_memo(move || {
-        info!("current_balance()");
+    let mut current_sol = use_signal(move || 0.0);
+    use_effect(move || {
+        info!("current_sol()");
+        let w2 = wallet_balance.read();
+
         if let Some(key) = *current_wallet.read() {
-            if let Some(hash) = wallet_balance.read().as_ref() {
+            if let Some(hash) = w2.as_ref() {
                 if let Some(Some(acc)) = hash.get(&key) {
-                    return acc.lamports as f64 / 1000000000.0;
+                    current_sol.set( acc.lamports as f64 / 1000000000.0);
+                } else {
+                    current_sol.set(0.0);
                 }
             }
         }
-        return 0.0;
     });
+
+    let mut all_wallets_pk = use_signal(move || vec![]);
+    use_effect(move || {
+        info!("all_wallets()");
+        let w = all_wallets
+            .read().iter()
+            .map(|k| k.keypair().pubkey())
+            .collect::<Vec<_>>();
+        all_wallets_pk.set(w);
+    });
+
+
+    let do_refresh_values= Callback::new(move |_| {
+        info!("wallet do refresh values!");
+        wallet_balance.restart();
+    });
+
+    let set_current_wallet = Callback::new( move |x_| {
+        current_wallet.set(x_);
+        do_refresh_values.call(());
+    });
+
+    let mut current_credit = use_signal(move || 0);
+    use_effect(move || {
+        let sol = *current_sol.read();
+        let credit_float = sol / (CREDIT_IN_LAMPORTS as f64 / 1000000000.0);
+        let credit = credit_float as i64;
+        current_credit.set(credit);
+    });
+
+    use_context_provider(move || WalletSignals{current_credit, current_wallet, all_wallets, current_keypair, current_sol, all_wallets_pk, wallet_balance, set_current_wallet, do_refresh_values});
+}
+
+pub fn wallet_signals() -> WalletSignals {
+    use_context::<WalletSignals>()
+}
+
+#[component]
+pub fn CurrentWalletDropdown() -> Element {
+    let w = wallet_signals();
 
     let ev_to_data = move |_ev: Event<FormData>| -> String {
         // info!("VAL: {_ev:?}");
         let data = _ev.data().clone();
         let value = data.value();
-
         value
     };
 
@@ -100,15 +146,15 @@ pub fn CurrentWalletDropdown() -> Element {
                 id: "current_account",
                 oninput: move |_ev| {
                     let val = ev_to_data(_ev);
-                    current_wallet.set(Pubkey::from_str(&val).ok());
+                    w.set_current_wallet.call(Pubkey::from_str(&val).ok());
                 },
     
-                for pubkey in all_wallets.read().iter() {
+                for pubkey in w.all_wallets_pk.read().iter() {
                     option {
                         value: "{pubkey}",
                         " {pubkey} = ",
                         {
-                            format!("{:?}", if let Some(hash) = wallet_balance.read().as_ref() {
+                            format!("{:?}", if let Some(hash) = w.wallet_balance.read().as_ref() {
                                 if let Some(Some(acc)) = hash.get(&pubkey) {
                                     Some( acc.lamports as f64 / 1000000000.0)
                                 } else {
@@ -123,7 +169,7 @@ pub fn CurrentWalletDropdown() -> Element {
                 }
             }
             h1 {
-                "{current_balance:?} SOL"
+                "{w.current_sol:?} SOL"
             }
 
         }
@@ -156,17 +202,15 @@ impl From<Keypair> for SerializedKeypair {
 }
 
 impl SerializedKeypair {
-    fn keypair(&self) -> Keypair {
+    pub fn keypair(&self) -> Keypair {
         Keypair::from_bytes(&self.0).unwrap()
     }
 }
 
 #[component]
 pub fn WalletDashboard() -> Element {
-
-
     rsx! {
-        PlayerAccountList {accounts:all_wallets()}
+        PlayerAccountList {accounts:wallet_signals().all_wallets}
     }
 }
 
@@ -304,9 +348,9 @@ fn PlayerAccountDisplay(
 
 #[component]
 fn DisplayCurrentWallet(account: Pubkey) -> Element {
-    let mut wallet = current_wallet();
+    let wallet = wallet_signals();
 
-    if Some(account) == wallet.read().clone() {
+    if Some(account) == wallet.current_wallet.read().clone() {
         rsx! {
             h1 {
                 "Is current Wallet"
@@ -316,7 +360,7 @@ fn DisplayCurrentWallet(account: Pubkey) -> Element {
         rsx! {
             button {
                 onclick: move |_| {
-                    wallet.set(Some(account));
+                    wallet.set_current_wallet.call(Some(account));
                 },
 
                 "Set current Wallet",

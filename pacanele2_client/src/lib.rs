@@ -24,6 +24,7 @@ pub use solana_sdk::{
 pub use wasm_client_solana::solana_transaction_status::UiTransactionEncoding;
 pub use std::str::FromStr;
 
+pub const CREDIT_IN_LAMPORTS: u64 = 405694;
 
 pub fn get_program_address() -> Pubkey {
     let program_address: &str = include_str!("../../pacanele2/program_address.txt")
@@ -158,16 +159,6 @@ pub async fn send_money(client: &RpcClient, payer: Keypair, target: Pubkey, lamp
     ]).await
 }
 
-pub async fn demo() -> Result<UiTransactionStatusMeta, String> {
-    let client = get_client().await;
-
-    // Generate a new keypair for the payer
-    let payer = create_new_keypair();
-
-    request_airdrop( &client, &payer.pubkey(), 1).await;
-
-    spin_pcnl(&client, payer).await
-}
 
 pub fn base64_decode_return(r: &UiTransactionStatusMeta) -> Vec<u8> {
     let s = r.return_data.clone().unwrap().data.0;

@@ -28,7 +28,7 @@ impl Default for AudioSettings {
     }
 }
 
-pub fn make_audio_loop_coroutine() {
+pub fn init_make_audio_loop_coroutine() {
     let mut oscillators: Signal<Option<OscillatorList>> = use_signal(|| None);
     let audio_settings = use_signal(|| AudioSettings::default());
     use_context_provider(move || audio_settings);
