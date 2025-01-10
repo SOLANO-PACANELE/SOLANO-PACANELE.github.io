@@ -42,6 +42,7 @@ pub fn WalletDashboard() -> Element {
 
 #[component]
 fn PlayerAccountList(accounts: Signal<Vec<SerializedKeypair>>)->Element {
+    let bank_address = pacanele2_client::get_bank_address().0;
     let delete_me = move |account| {
         accounts.write().retain(|k| k.keypair().pubkey() != account);
     };
@@ -65,7 +66,7 @@ fn PlayerAccountList(accounts: Signal<Vec<SerializedKeypair>>)->Element {
         div {
             style: "border: 1px solid black;",
             h1 {                "Bank"             }
-            PlayerAccountDisplay {account:pacanele2_client::get_bank_address(), on_forget:delete_me, send_money}
+            PlayerAccountDisplay {account:bank_address, on_forget:delete_me, send_money}
 
             h1 {
                 "Player Wallets"

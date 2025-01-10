@@ -23,19 +23,21 @@ pub fn process_instruction(
     let accounts_iter = &mut _accounts.iter();
     let sysvar_slot_history = next_account_info(accounts_iter)?;
     let bank_account = next_account_info(accounts_iter)?;
+    let bank_bump = _instruction_data[0];
+    let bank_signer_seeds: &[&[&[u8]]] = &[&[b"bank",&[bank_bump]]];
     let player_account = next_account_info(accounts_iter)?;
     let system_program = next_account_info(accounts_iter)?;
 
     // send credits to bank account
+    msg!("insert coin: {} lamports", CREDIT_IN_LAMPORTS);
     let insert_coin_instruction = solana_program::system_instruction::transfer(player_account.key, bank_account.key, CREDIT_IN_LAMPORTS);
-
     solana_program::program::invoke(&insert_coin_instruction, &[
         player_account.to_owned(), bank_account.to_owned(), system_program.to_owned(),
     ])?;
 
     // compute funny random
     let not_random = not_really_random(sysvar_slot_history, 0)?;
-    msg!("\n{:?}\n{:?}", &not_random[0..16], &not_random[16..32]);
+    msg!("funny random: {:?}", not_random);
 
     // compute banana seed
     use rand_chacha::ChaCha8Rng;
@@ -45,9 +47,27 @@ pub fn process_instruction(
     let seed = chacha.gen();
 
     // compute banana
+    msg!("banana seeds: {:?}", seed);
     let r = rules::rule_set::RuleSet::p96();
     let rv = r.play_random_from_seed(seed);
+    let win = rv.1 as u64;
     msg!("RESULT: {:?}", rv);
+
+    // send win back
+    if win > 0 {
+        let win_lamports = CREDIT_IN_LAMPORTS * win;
+        msg!("won {} lamports", win_lamports);
+        let return_win_instruction = solana_program::system_instruction::transfer(
+            bank_account.key, player_account.key, win_lamports,
+        );
+        solana_program::program::invoke_signed(
+            &return_win_instruction,
+            &[bank_account.to_owned(), player_account.to_owned(),  system_program.to_owned(),],
+            bank_signer_seeds,
+        )?;
+    }
+
+    // set return data
     let rv = bincode::serialize(&rv).unwrap();
     set_return_data(&rv);
 

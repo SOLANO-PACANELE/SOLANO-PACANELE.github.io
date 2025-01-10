@@ -31,10 +31,10 @@ pub fn get_program_address() -> Pubkey {
     program_id
 }
 
-pub fn get_bank_address() -> Pubkey {
+pub fn get_bank_address() -> (Pubkey, u8) {
     let program_id = get_program_address();
     let seed = b"bank";
-    Pubkey::find_program_address(&[seed], &program_id).0
+    Pubkey::find_program_address(&[seed], &program_id)
 }
 
 
@@ -104,10 +104,12 @@ pub async fn run_transaction(client: &RpcClient, payer: Keypair, instructions: &
 
 pub async fn spin_pcnl(client: &RpcClient, payer: Keypair) -> Result<UiTransactionStatusMeta, String> {
     let program_id = get_program_address();
+    let (bank_address, bank_bump) = get_bank_address();
 
     let instruction_spin_pcnl = Instruction::new_with_bytes(
         program_id,
-        &[], // Empty instruction data
+        // instruction data = bank account bump (for seed)
+        &[bank_bump],
         // account data
         vec![
             // 1st account = slot_hashes metavar for some bytes
@@ -118,7 +120,7 @@ pub async fn spin_pcnl(client: &RpcClient, payer: Keypair) -> Result<UiTransacti
             },
             // 2nd account = bank
             AccountMeta {
-                pubkey: get_bank_address(),
+                pubkey: bank_address,
                 is_signer: false,
                 is_writable: true,
             },

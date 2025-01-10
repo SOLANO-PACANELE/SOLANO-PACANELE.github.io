@@ -38,6 +38,7 @@ pub fn SolanaDemo() -> Element {
 pub async fn get_spin_result_from_solana() -> ((Vec<Fruit>, u16), Vec<String>) {
     use rules::Fruit;
     let x = pacanele2_client::demo().await.unwrap();
+    info!("{:#?}", x);
     let b = pacanele2_client::base64_decode_return(&x);
     let xr = bincode::deserialize::<(Vec<Fruit>, u16)>(&b).unwrap();
     (xr, x.log_messages.clone().unwrap())
