@@ -7,7 +7,7 @@ use crate::{
     gen_css::make_transform_string,
     random::get_wheel_shuffle,
     state::{PcnlState, PcnlWheelState, ShuffleState, WheelShuffleState, WheelStage},
-    time::{get_current_ts, sleep},
+    time::{get_current_ts, sleep}, wallet::CurrentWalletDropdown,
 };
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
@@ -97,7 +97,8 @@ pub fn Pacanele() -> Element {
         }
         div {
             id: "bottom-box",
-            Autoplay{enable_autoplay}
+            Autoplay{enable_autoplay},
+            CurrentWalletDropdown{}
         }
         div { id: "right-box",
             SpinButton { pcnl_state, shuf_state, pcnl_count, enable_autoplay }

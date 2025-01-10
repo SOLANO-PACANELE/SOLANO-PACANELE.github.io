@@ -5,6 +5,8 @@ use wasm_client_solana::solana_transaction_status::UiTransactionReturnData;
 use solana_sdk::transaction_context::TransactionReturnData;
 use wasm_client_solana::solana_transaction_status::UiTransactionStatusMeta;
 
+pub use solana_sdk::account::Account;
+
 pub use wasm_client_solana::SolanaRpcClient as RpcClient;
 pub use wasm_client_solana::ClientResult;
 pub use wasm_client_solana::RpcTransactionConfig;

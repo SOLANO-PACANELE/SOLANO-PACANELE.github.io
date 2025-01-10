@@ -1,6 +1,9 @@
 
+use std::collections::HashMap;
+
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
+use pacanele2_client::Account;
 use pacanele2_client::FromStr;
 use pacanele2_client::Keypair;
 use pacanele2_client::Pubkey;
@@ -8,20 +11,132 @@ use pacanele2_client::Signer;
 
 
 #[derive(Clone, Debug, Copy)]
-struct WalletSelector(Signal<Option<Pubkey>>);
+struct WalletSelector{
+    current_wallet: Signal<Option<Pubkey>>,
+    all_wallets:  Signal<Vec<SerializedKeypair>>,
+}
 
 
 pub fn make_wallet_selector()  {
-    let signal: Signal<Option<Pubkey>> = dioxus_sdk::storage::use_synced_storage::<
+    let current_wallet: Signal<Option<Pubkey>> = dioxus_sdk::storage::use_synced_storage::<
     dioxus_sdk::storage::LocalStorage,
     Option<Pubkey>,
 >("current_wallet_pubkey".to_string(), || None);
-    use_context_provider(move || WalletSelector(signal));
+
+    let all_wallets = dioxus_sdk::storage::use_synced_storage::<
+    dioxus_sdk::storage::LocalStorage,
+    Vec<SerializedKeypair>,
+>("wallet_keypairs".to_string(), || vec![]);
+    use_context_provider(move || WalletSelector{current_wallet, all_wallets});
 }
 
 pub fn current_wallet() -> Signal<Option<Pubkey>> {
     let s = use_context::<WalletSelector>();
-    s.0
+    s.current_wallet
+}
+
+pub fn all_wallets() -> Signal<Vec<SerializedKeypair>> {
+    use_context::<WalletSelector>().all_wallets
+}
+
+#[component]
+pub fn CurrentWalletDropdown() -> Element {
+    let all_wallet_serial = all_wallets();
+    let mut all_wallets = use_signal(move || vec![]);
+    use_effect(move || {
+        info!("all_wallets()");
+        let w = all_wallet_serial
+            .read().iter()
+            .map(|k| k.keypair().pubkey())
+            .collect::<Vec<_>>();
+        all_wallets.set(w);
+    });
+
+    let mut current_wallet = current_wallet();
+
+    let wallet_balance = use_resource(move || async move {
+        info!("wallet_balance()");
+        let client = pacanele2_client::get_client().await;
+        let mut hash = HashMap::<Pubkey, Option<Account>>::new();
+        for w in  all_wallets.read().iter() 
+        {
+            hash.insert(*w, client.get_account(w).await.ok());
+        }
+        hash
+    });
+
+    let current_balance = use_memo(move || {
+        info!("current_balance()");
+        if let Some(key) = *current_wallet.read() {
+            if let Some(hash) = wallet_balance.read().as_ref() {
+                if let Some(Some(acc)) = hash.get(&key) {
+                    return acc.lamports as f64 / 1000000000.0;
+                }
+            }
+        }
+        return 0.0;
+    });
+
+    let ev_to_data = move |_ev: Event<FormData>| -> String {
+        // info!("VAL: {_ev:?}");
+        let data = _ev.data().clone();
+        let value = data.value();
+
+        value
+    };
+
+
+    rsx! {
+        div {
+            style: "display:flex;  align-items: center;",
+            label {
+                r#for: "current_account",
+                h1 {
+                    "Current Account"
+                }
+            },
+            select {
+                name: "current_account",
+                id: "current_account",
+                oninput: move |_ev| {
+                    let val = ev_to_data(_ev);
+                    current_wallet.set(Pubkey::from_str(&val).ok());
+                },
+    
+                for pubkey in all_wallets.read().iter() {
+                    option {
+                        value: "{pubkey}",
+                        " {pubkey} = ",
+                        {
+                            format!("{:?}", if let Some(hash) = wallet_balance.read().as_ref() {
+                                if let Some(Some(acc)) = hash.get(&pubkey) {
+                                    Some( acc.lamports as f64 / 1000000000.0)
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            })
+                        } , 
+                        "SOL"
+                    }
+                }
+            }
+            h1 {
+                "{current_balance:?} SOL"
+            }
+
+        }
+
+        // <label for="cars">Choose a car:</label>
+
+        // <select name="cars" id="cars">
+        //   <option value="volvo">Volvo</option>
+        //   <option value="saab">Saab</option>
+        //   <option value="mercedes">Mercedes</option>
+        //   <option value="audi">Audi</option>
+        // </select> 
+    }
 }
 
 
@@ -48,13 +163,10 @@ impl SerializedKeypair {
 
 #[component]
 pub fn WalletDashboard() -> Element {
-    let accounts = dioxus_sdk::storage::use_synced_storage::<
-        dioxus_sdk::storage::LocalStorage,
-        Vec<SerializedKeypair>,
-    >("wallet_keypairs".to_string(), || vec![]);
+
 
     rsx! {
-        PlayerAccountList {accounts}
+        PlayerAccountList {accounts:all_wallets()}
     }
 }
 
