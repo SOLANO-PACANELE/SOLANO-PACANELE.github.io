@@ -1,4 +1,3 @@
-use std::ops::Deref;
 
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
@@ -6,6 +5,25 @@ use pacanele2_client::FromStr;
 use pacanele2_client::Keypair;
 use pacanele2_client::Pubkey;
 use pacanele2_client::Signer;
+
+
+#[derive(Clone, Debug, Copy)]
+struct WalletSelector(Signal<Option<Pubkey>>);
+
+
+pub fn make_wallet_selector()  {
+    let signal: Signal<Option<Pubkey>> = dioxus_sdk::storage::use_synced_storage::<
+    dioxus_sdk::storage::LocalStorage,
+    Option<Pubkey>,
+>("current_wallet_pubkey".to_string(), || None);
+    use_context_provider(move || WalletSelector(signal));
+}
+
+pub fn current_wallet() -> Signal<Option<Pubkey>> {
+    let s = use_context::<WalletSelector>();
+    s.0
+}
+
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct SerializedKeypair(Vec<u8>);
@@ -162,8 +180,38 @@ fn PlayerAccountDisplay(
                     "forget"
                 }
             }
+            div {
+                style: "border: solid black 1px; width:max-content; padding: 10pt; margin: 10pt;",
+
+                DisplayCurrentWallet{account}
+            }
+
         }
     }
+}
+
+#[component]
+fn DisplayCurrentWallet(account: Pubkey) -> Element {
+    let mut wallet = current_wallet();
+
+    if Some(account) == wallet.read().clone() {
+        rsx! {
+            h1 {
+                "Is current Wallet"
+            }
+        }
+    } else {
+        rsx! {
+            button {
+                onclick: move |_| {
+                    wallet.set(Some(account));
+                },
+
+                "Set current Wallet",
+            }
+        }
+    }
+
 }
 
 #[component]

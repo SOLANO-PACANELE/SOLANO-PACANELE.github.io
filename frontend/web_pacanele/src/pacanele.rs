@@ -2,15 +2,15 @@ use core::f64;
 use std::collections::HashMap;
 
 use crate::{
-    audio::{make_audio_loop_coroutine, send_audio_event, AudioEvent},
+    audio::{send_audio_event, AudioEvent},
     client::get_spin_result_from_solana,
-    gen_css::{make_animation_string, make_transform_string},
-    random::{get_wheel_results, get_wheel_shuffle},
+    gen_css::make_transform_string,
+    random::get_wheel_shuffle,
     state::{PcnlState, PcnlWheelState, ShuffleState, WheelShuffleState, WheelStage},
     time::{get_current_ts, sleep},
 };
 use dioxus::prelude::*;
-use dioxus_logger::tracing::{info, Level};
+use dioxus_logger::tracing::info;
 use rules::{rule_set::RuleSet, Fruit};
 
 fn random_spin_period(on_autoplay: bool) -> f64 {
@@ -226,7 +226,7 @@ fn SpinButton(
     info!("SpinButton()");
 
     let mut effects_running = use_signal(|| false);
-    let mut have_money = use_memo(move || {
+    let have_money = use_memo(move || {
         if let Some(s) = pcnl_state.read().as_ref() {
             let m = s.money;
             m > 0

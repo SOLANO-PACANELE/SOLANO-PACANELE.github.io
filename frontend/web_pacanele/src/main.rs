@@ -1,20 +1,15 @@
-use core::f64;
-use std::collections::HashMap;
 
 use dioxus::prelude::*;
-use dioxus_logger::tracing::{info, Level};
-use rules::{rule_set::RuleSet, Fruit};
+use dioxus_logger::tracing::Level;
+use rules::Fruit;
 use web_pacanele::{
-    audio::{make_audio_loop_coroutine, send_audio_event, AudioEvent},
-    gen_css::{make_animation_string, make_transform_string},
-    random::{get_wheel_results, get_wheel_shuffle},
-    state::{PcnlState, PcnlWheelState, ShuffleState, WheelShuffleState, WheelStage},
-    time::{get_current_ts, sleep},
+    audio::make_audio_loop_coroutine,
+    gen_css::make_animation_string,
 };
 
 use web_pacanele::client::SolanaDemo;
 use web_pacanele::pacanele::Pacanele;
-use web_pacanele::wallet::WalletDashboard;
+use web_pacanele::wallet::{make_wallet_selector, WalletDashboard};
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
@@ -37,6 +32,7 @@ fn main() {
 #[component]
 fn App() -> Element {
     make_audio_loop_coroutine();
+    make_wallet_selector();
     rsx! {
         document::Link { rel: "icon", href: FAVICON }
         document::Link { rel: "stylesheet", href: MAIN_CSS }

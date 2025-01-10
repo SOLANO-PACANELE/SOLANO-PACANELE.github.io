@@ -1,5 +1,4 @@
 use dioxus::prelude::*;
-use dioxus_elements::h1;
 use dioxus_logger::tracing::*;
 use rules::Fruit;
 
