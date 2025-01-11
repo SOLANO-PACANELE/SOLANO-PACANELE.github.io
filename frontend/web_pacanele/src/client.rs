@@ -3,7 +3,7 @@ use dioxus_logger::tracing::*;
 use pacanele2_client::{Keypair, Signer};
 use rules::Fruit;
 
-use crate::wallet::{wallet_signals, CurrentWalletDropdown};
+use crate::wallet::{wallet_signals, BetAmountControl, CurrentWalletDropdown};
 
 #[component]
 pub fn SolanaDemo() -> Element {
@@ -18,12 +18,13 @@ pub fn SolanaDemo() -> Element {
                 "Solana Demo"
             }
             CurrentWalletDropdown {}
+            BetAmountControl {}
 
             button {
                 onclick: move |_| {
                     async move {
                         if let Some(k) = wallet.current_keypair.peek().as_ref() {
-                            let xr = get_spin_result_from_solana(k.insecure_clone()).await;
+                            let xr = get_spin_result_from_solana(k.insecure_clone(), *wallet.current_bet_exp.peek()).await;
                             wallet.do_refresh_values.call(());
                             let xr = format!("{:#?}", xr);
                             output.set(xr);
@@ -46,13 +47,14 @@ pub fn SolanaDemo() -> Element {
 
 pub async fn get_spin_result_from_solana(
     sender: Keypair,
+    bet_amount_exp: u8,
 ) -> Result<((Vec<Fruit>, u16), Vec<String>), String> {
     // return Ok(((vec![Fruit::seven;3], 12345), vec!["fake".to_string()]));
 
-    info!("get_spin_result_from_solana()");
+    info!("get_spin_result_from_solana({bet_amount_exp})");
     let client = pacanele2_client::get_client().await;
     use rules::Fruit;
-    let x = pacanele2_client::spin_pcnl(&client, sender).await?;
+    let x = pacanele2_client::spin_pcnl(&client, sender, bet_amount_exp).await?;
     info!(
         "get_spin_result_from_solana() : final transaction status = {:?}",
         x.status

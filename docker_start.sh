@@ -23,3 +23,5 @@ sleep 2
 until docker exec solana solana balance; do sleep 1; done
 echo "SOLANA OK"
 echo "visit http://localhost:3000"
+
+./build.sh

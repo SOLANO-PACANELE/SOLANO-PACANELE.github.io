@@ -8,11 +8,10 @@ use crate::{
     random::get_wheel_shuffle,
     state::{PcnlState, PcnlWheelState, ShuffleState, WheelShuffleState, WheelStage},
     time::{get_current_ts, sleep},
-    wallet::{wallet_signals, CurrentWalletDropdown},
+    wallet::{wallet_signals, BetAmountControl, CurrentWalletDropdown},
 };
 use dioxus::prelude::*;
 use dioxus_logger::tracing::info;
-use pacanele2_client::CREDIT_IN_LAMPORTS;
 use rules::{rule_set::RuleSet, Fruit};
 
 fn random_spin_period(on_autoplay: bool) -> f64 {
@@ -92,6 +91,8 @@ pub fn Pacanele() -> Element {
         }
         div { id: "right-box",
             SpinButton { pcnl_state, shuf_state, pcnl_count, enable_autoplay }
+            
+            BetAmountControl {}
         }
 
         div { id: "pacanele",
@@ -230,6 +231,9 @@ fn SpinButton(
     let wallet: crate::wallet::WalletSignals = wallet_signals();
 
     let mut effects_running = use_signal(|| false);
+    let have_money = use_memo(move || {
+        *wallet.current_bet_exp.read() > 10 && *wallet.current_credit.read() > 0
+    });
 
     let wheels_ready = use_memo(move || {
         if let Some(PcnlState { wheels, .. }) = pcnl_state.read().as_ref() {
@@ -248,6 +252,7 @@ fn SpinButton(
     let spin_courutine = use_coroutine(move |mut rx: UnboundedReceiver<()>| {
         async move {
             loop {
+                sleep(0.01).await;
                 use futures_util::stream::StreamExt;
                 let _rx = rx.next().await;
                 while let Ok(Some(_m)) = rx.try_next() {
@@ -265,9 +270,14 @@ fn SpinButton(
                     info!("state empty before spin.");
                     continue;
                 };
+                if !*have_money.read() {
+                    info!("no money.");
+                    continue;
+                }
 
                 state.last_win = None;
                 state.last_messages = vec![];
+                let state_init = state.clone();
                 // Start spin. we do not yet have spin results (can take 5-10s on chain),
                 // so we spin in place from the starting position a whole (integer) number of spins.
                 effects_running.set(true);
@@ -293,16 +303,24 @@ fn SpinButton(
                 let keypair = if let Some(keypair) = wallet.current_keypair.peek().as_ref() {
                     keypair.insecure_clone()
                 } else {
-                    info!("PCNL FAIL!!!");
+                    info!("PCNL FAIL: NO KEYPAIR!!!");
+                    effects_running.set(false);
                     send_audio_event(AudioEvent::StopAudio);
+                    pcnl_state.set(Some(state_init));
                     continue;
                 };
 
-                let res = get_spin_result_from_solana(keypair).await;
-                let Ok(((new_results, new_reward), log_messages)) = res else {
-                    info!("PCNL FAIL!!!");
-                    send_audio_event(AudioEvent::StopAudio);
-                    continue;
+                let res = get_spin_result_from_solana(keypair, *wallet.current_bet_exp.peek()).await;
+
+                let (new_results, new_reward, log_messages) = match res {
+                    Ok(((new_results, new_reward), log_messages))  => (new_results, new_reward, log_messages),
+                    Err(e) => {
+                        info!("PCNL FAIL : {:?}!!!", e);
+                        effects_running.set(false);
+                        send_audio_event(AudioEvent::StopAudio);
+                        pcnl_state.set(Some(state_init));
+                        continue;
+                    }
                 };
                 wallet.do_refresh_values.call(());
                 assert!(new_results.len() == state.wheels.len());
@@ -376,7 +394,7 @@ fn SpinButton(
 
     rsx! {
         {
-            if *wheels_ready.read() && !*effects_running.read() {
+            if *wheels_ready.read() && !*effects_running.read() && *have_money.read() {
                 info!("spin button on");
                 rsx! {
                     button {
@@ -391,7 +409,15 @@ fn SpinButton(
                 }
             } else {
                 info!("spin button off");
-                rsx! {}
+                if !*have_money.read() {
+                    rsx! {
+                        h1 {
+                            "No credit."
+                        }
+                    }
+                } else {
+                    rsx! {}
+                }
             }
         }
     }

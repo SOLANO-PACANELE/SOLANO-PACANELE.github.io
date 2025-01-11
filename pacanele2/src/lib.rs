@@ -12,7 +12,66 @@ use solana_program::sysvar::Sysvar;
 
 entrypoint!(process_instruction);
 
-const CREDIT_IN_LAMPORTS: u64 = 405694;
+struct InputParameters<'a, 'b> {
+    sysvar_slot_history: &'b AccountInfo<'a>,
+    bank_account: &'b AccountInfo<'a>,
+    bank_bump: u8,
+    player_account: &'b AccountInfo<'a>,
+    system_program: &'b AccountInfo<'a>,
+    bet_amount: u64,
+}
+
+fn extract_input<'a, 'b>(_accounts: &'b [AccountInfo<'a>], _instruction_data: &[u8]) -> Result<InputParameters<'a, 'b>, ProgramError> {
+    let accounts_iter = &mut _accounts.iter();
+    let sysvar_slot_history = next_account_info(accounts_iter)?;
+    let bank_account = next_account_info(accounts_iter)?;
+    let bank_bump = _instruction_data[0];
+    let player_account = next_account_info(accounts_iter)?;
+    let system_program = next_account_info(accounts_iter)?;
+    let bet_amount = 1_u64 <<( _instruction_data[1] as u64);
+    Ok(InputParameters {
+        sysvar_slot_history,bank_account,bank_bump,player_account,system_program, bet_amount
+    })
+}
+
+fn invoke_transfer_player_to_bank(input: &InputParameters, amount: u64) -> Result<(), ProgramError> {
+    // msg!("insert coin: {} lamports", amount);
+    let insert_coin_instruction = solana_program::system_instruction::transfer(
+        input.player_account.key,
+        input.bank_account.key,
+        amount,
+    );
+    solana_program::program::invoke(
+        &insert_coin_instruction,
+        &[
+            input.player_account.to_owned(),
+            input.bank_account.to_owned(),
+            input.system_program.to_owned(),
+        ],
+    )?;
+
+    Ok(())
+}
+
+fn invoke_transfer_bank_to_player(input: &InputParameters, amount: u64) -> Result<(), ProgramError> {
+    // msg!("won {} lamports", amount);
+    let return_win_instruction = solana_program::system_instruction::transfer(
+        input.bank_account.key,
+        input.player_account.key,
+        amount,
+    );
+    let bank_signer_seeds: &[&[&[u8]]] = &[&[b"bank", &[input.bank_bump]]];
+    solana_program::program::invoke_signed(
+        &return_win_instruction,
+        &[
+            input.bank_account.to_owned(),
+            input.player_account.to_owned(),
+            input.system_program.to_owned(),
+        ],
+        bank_signer_seeds,
+    )?;
+    Ok(())
+}
 
 pub fn process_instruction(
     _program_id: &Pubkey,
@@ -20,33 +79,22 @@ pub fn process_instruction(
     _instruction_data: &[u8],
 ) -> ProgramResult {
     // extract accounts
-    let accounts_iter = &mut _accounts.iter();
-    let sysvar_slot_history = next_account_info(accounts_iter)?;
-    let bank_account = next_account_info(accounts_iter)?;
-    let bank_bump = _instruction_data[0];
-    let bank_signer_seeds: &[&[&[u8]]] = &[&[b"bank", &[bank_bump]]];
-    let player_account = next_account_info(accounts_iter)?;
-    let system_program = next_account_info(accounts_iter)?;
+    let input = extract_input(_accounts, _instruction_data)?;
+
+    
+    // msg!("after init accounts:");    ::solana_program::log::sol_log_compute_units();
 
     // send credits to bank account
-    msg!("insert coin: {} lamports", CREDIT_IN_LAMPORTS);
-    let insert_coin_instruction = solana_program::system_instruction::transfer(
-        player_account.key,
-        bank_account.key,
-        CREDIT_IN_LAMPORTS,
-    );
-    solana_program::program::invoke(
-        &insert_coin_instruction,
-        &[
-            player_account.to_owned(),
-            bank_account.to_owned(),
-            system_program.to_owned(),
-        ],
-    )?;
+    invoke_transfer_player_to_bank(&input, input.bet_amount)?;
+
+    // msg!("after insert coin:");    ::solana_program::log::sol_log_compute_units();
 
     // compute funny random
-    let not_random = not_really_random(sysvar_slot_history, 0)?;
-    msg!("funny random: {:?}", not_random);
+    let not_random = not_really_random(input.sysvar_slot_history, 0)?;
+    // msg!("funny random: {:?}", not_random);
+
+    
+    // msg!("after funny random:");    ::solana_program::log::sol_log_compute_units();
 
     // compute banana seed
     use rand::Rng;
@@ -55,36 +103,34 @@ pub fn process_instruction(
     let mut chacha = ChaCha8Rng::from_seed(not_random);
     let seed = chacha.gen();
 
+    
+    // msg!("after banana seed:");    ::solana_program::log::sol_log_compute_units();
+
     // compute banana
-    msg!("banana seeds: {:?}", seed);
+    // msg!("banana seeds: {:?}", seed);
     let r = rules::rule_set::RuleSet::p96();
     let rv = r.play_random_from_seed(seed);
     let win = rv.1 as u64;
-    msg!("RESULT: {:?}", rv);
+    // msg!("RESULT: {:?}", rv);
+
+    
+    // msg!("after banana result:");    ::solana_program::log::sol_log_compute_units();
 
     // send win back
     if win > 0 {
-        let win_lamports = CREDIT_IN_LAMPORTS * win;
-        msg!("won {} lamports", win_lamports);
-        let return_win_instruction = solana_program::system_instruction::transfer(
-            bank_account.key,
-            player_account.key,
-            win_lamports,
-        );
-        solana_program::program::invoke_signed(
-            &return_win_instruction,
-            &[
-                bank_account.to_owned(),
-                player_account.to_owned(),
-                system_program.to_owned(),
-            ],
-            bank_signer_seeds,
-        )?;
+        let win_lamports = input.bet_amount * win;
+        invoke_transfer_bank_to_player(&input, win_lamports)?;
     }
+
+    
+    // msg!("after send win back:");    ::solana_program::log::sol_log_compute_units();
 
     // set return data
     let rv = bincode::serialize(&rv).unwrap();
     set_return_data(&rv);
+
+    
+    msg!("after set return data:");    ::solana_program::log::sol_log_compute_units();
 
     Ok(())
 }

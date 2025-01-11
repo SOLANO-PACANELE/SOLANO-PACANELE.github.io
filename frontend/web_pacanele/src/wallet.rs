@@ -7,7 +7,6 @@ use pacanele2_client::FromStr;
 use pacanele2_client::Keypair;
 use pacanele2_client::Pubkey;
 use pacanele2_client::Signer;
-use pacanele2_client::CREDIT_IN_LAMPORTS;
 
 #[derive(Clone, Debug, Copy)]
 pub struct WalletSignals {
@@ -20,6 +19,9 @@ pub struct WalletSignals {
     pub set_current_wallet: Callback<Option<Pubkey>>,
     pub do_refresh_values: Callback<()>,
     pub current_credit: Signal<i64>,
+    pub bet_exp_interval: Signal<Option<(u8, u8)>>,
+    pub current_bet_exp: Signal<u8>,
+    pub set_bet_exp: Callback<u8>,
 }
 
 pub fn init_make_wallet_selector() {
@@ -88,9 +90,44 @@ pub fn init_make_wallet_selector() {
                     current_sol.set(0.0);
                     info!("current sol = {}", 0.0);
                 }
+            } else {
+                info!("no current hash!");
+                current_sol.set(0.0);
             }
         } else {
             info!("no current wallet!")
+        }
+    });
+
+    let bet_interval_res = use_resource(move || {
+        // re-run bet interval when account changes
+        let key = current_wallet.read().as_ref().cloned();
+        // re-run bet interval when current solana changes
+        let _sol = *current_sol.read();
+        async move {
+            if _sol > 0.0 {
+                if let Some(key) = key {
+                    let client = pacanele2_client::get_client().await;
+                    pacanele2_client::pcnl_possible_bet_interval(&client, &key).await
+                } else {
+                    Err("no current account".to_string())
+                }
+            } else {
+                Err("no solana in account".to_string())
+            }
+        }
+    });
+    let mut bet_exp_interval = use_signal(|| None);
+    let mut current_bet_exp = use_signal(|| 0);
+    use_effect(move || {
+        let mut c_e = current_bet_exp.write();
+        if let Some(Ok(x)) = bet_interval_res.read().as_ref() {
+            let (min, max) = *x;
+            bet_exp_interval.set(Some(*x));
+            *c_e = (*c_e).clamp(min, max);
+        } else {
+            bet_exp_interval.set(None);
+            *c_e = 0;
         }
     });
 
@@ -118,9 +155,22 @@ pub fn init_make_wallet_selector() {
     let mut current_credit = use_signal(move || 0);
     use_effect(move || {
         let sol = *current_sol.read();
-        let credit_float = sol / (CREDIT_IN_LAMPORTS as f64 / 1000000000.0);
-        let credit = credit_float as i64;
-        current_credit.set(credit);
+        let bet_exp = *current_bet_exp.read();
+        if bet_exp > 10 && bet_exp < 63 && sol > 0.0 {
+            let bet_exp_lamp = 1_u64 << (bet_exp as u64);
+            let credit_float  = sol / (bet_exp_lamp as f64 / 1000000000.0);
+            let credit = credit_float as i64;
+            current_credit.set(credit);
+        } else {
+            current_credit.set(0);
+        }
+    });
+    let set_bet_exp = Callback::new(move |_new: u8| {
+        let x = (*bet_exp_interval.read()).unwrap_or_default();
+        let _new = _new.clamp(x.0, x.1);
+        if _new > 10 && _new < 63 {
+            *current_bet_exp.write() = _new;
+        }
     });
 
     use_context_provider(move || WalletSignals {
@@ -132,12 +182,47 @@ pub fn init_make_wallet_selector() {
         all_wallets_pk,
         wallet_balance,
         set_current_wallet,
-        do_refresh_values,
+        do_refresh_values,bet_exp_interval,current_bet_exp, set_bet_exp
     });
 }
 
 pub fn wallet_signals() -> WalletSignals {
     use_context::<WalletSignals>()
+}
+
+#[component]
+pub fn BetAmountControl() -> Element {
+    let w = wallet_signals();
+    let bet_int = (*w.bet_exp_interval.read()).unwrap_or_default();
+    let bet_exp = (*w.current_bet_exp.read()).clamp(bet_int.0, bet_int.1);
+
+    let bet = (1_u64 << (bet_exp as u64)) as f64 / 1000000000.0;
+
+    rsx! {
+        if bet_exp > 0 {
+            h1 {
+                "Bet Amount: {bet} SOL",
+            }
+            button {
+                disabled: bet_exp >= bet_int.1,
+                onclick: move |_| {
+                    if bet_exp < 63 {
+                        w.set_bet_exp.call(bet_exp+1);
+                    }
+                },
+                h1 {"Bet +"},
+            },
+            button {
+                disabled: bet_exp <= bet_int.0,
+                onclick: move |_| {
+                    if bet_exp > 10 {
+                        w.set_bet_exp.call(bet_exp-1);
+                    }
+                },
+                h1 {"Bet -"},
+            }
+        }
+    }
 }
 
 #[component]
