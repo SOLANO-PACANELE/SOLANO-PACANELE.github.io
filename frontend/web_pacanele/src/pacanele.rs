@@ -252,7 +252,6 @@ fn SpinButton(
     let spin_courutine = use_coroutine(move |mut rx: UnboundedReceiver<()>| {
         async move {
             loop {
-                sleep(0.01).await;
                 use futures_util::stream::StreamExt;
                 let _rx = rx.next().await;
                 while let Ok(Some(_m)) = rx.try_next() {
@@ -393,33 +392,40 @@ fn SpinButton(
     });
 
     rsx! {
-        {
-            if *wheels_ready.read() && !*effects_running.read() && *have_money.read() {
-                info!("spin button on");
-                rsx! {
-                    button {
-                        onclick: move |_ev| {
-                            let tx = tx.clone();
-                            async move {
-                                let _ = tx.unbounded_send(());
-                            }
-                        },
-                        h1 { "Spin" }
-                    }
-                }
-            } else {
-                info!("spin button off");
-                if !*have_money.read() {
+        div {
+            id: "spin-pcnl-btn",
+            style: "height:80pt; width: 80pt;",
+
+            {
+                if *wheels_ready.read() && !*effects_running.read() && *have_money.read() {
+                    info!("spin button on");
                     rsx! {
-                        h1 {
-                            "No credit."
+                        button {
+                            style: "width: 100%; height: 100%;",
+                            onclick: move |_ev| {
+                                let tx = tx.clone();
+                                async move {
+                                    let _ = tx.unbounded_send(());
+                                }
+                            },
+                            h1 { "Spin" }
                         }
                     }
                 } else {
-                    rsx! {}
+                    info!("spin button off");
+                    if !*have_money.read() {
+                        rsx! {
+                            h1 {
+                                "No credit."
+                            }
+                        }
+                    } else {
+                        rsx! {}
+                    }
                 }
             }
         }
+
     }
 }
 

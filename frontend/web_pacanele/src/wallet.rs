@@ -204,6 +204,15 @@ pub fn BetAmountControl() -> Element {
                 "Bet Amount: {bet} SOL",
             }
             button {
+                disabled: bet_exp <= bet_int.0,
+                onclick: move |_| {
+                    if bet_exp > 10 {
+                        w.set_bet_exp.call(bet_exp-1);
+                    }
+                },
+                h1 {"Bet -"},
+            },
+            button {
                 disabled: bet_exp >= bet_int.1,
                 onclick: move |_| {
                     if bet_exp < 63 {
@@ -213,14 +222,14 @@ pub fn BetAmountControl() -> Element {
                 h1 {"Bet +"},
             },
             button {
-                disabled: bet_exp <= bet_int.0,
+                disabled: bet_exp >= bet_int.1,
                 onclick: move |_| {
-                    if bet_exp > 10 {
-                        w.set_bet_exp.call(bet_exp-1);
+                    if bet_exp < 63 {
+                        w.set_bet_exp.call(bet_int.1);
                     }
                 },
-                h1 {"Bet -"},
-            }
+                h1 {"Bet MAX"},
+            },
         }
     }
 }
