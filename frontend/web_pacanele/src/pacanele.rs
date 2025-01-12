@@ -410,6 +410,11 @@ fn SpinButton(
                         rsx! {
                             h1 {
                                 "No credit."
+                                br{}
+                                a {
+                                    href: "/wallet",
+                                    "Open Wallet!"
+                                }
                             }
                         }
                     } else {

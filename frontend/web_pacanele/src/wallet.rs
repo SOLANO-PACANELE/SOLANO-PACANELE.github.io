@@ -238,6 +238,10 @@ pub fn CurrentWalletDropdown() -> Element {
         value
     };
 
+    let val = use_memo (move || {
+        w.current_wallet.read().clone().map(|k| k.to_string()).unwrap_or("".to_string())
+    });
+
     rsx! {
         div {
             style: "display:flex;  align-items: center;",
@@ -254,6 +258,7 @@ pub fn CurrentWalletDropdown() -> Element {
                     let val = ev_to_data(_ev);
                     w.set_current_wallet.call(Pubkey::from_str(&val).ok());
                 },
+                value: "{val}",
 
                 for pubkey in w.all_wallets_pk.read().iter() {
                     option {
@@ -315,19 +320,20 @@ impl SerializedKeypair {
 #[component]
 pub fn WalletDashboard() -> Element {
     rsx! {
-        PlayerAccountList {accounts:wallet_signals().all_wallets}
+        PlayerAccountList {}
     }
 }
 
 #[component]
-fn PlayerAccountList(accounts: Signal<Vec<SerializedKeypair>>) -> Element {
+fn PlayerAccountList() -> Element {
+    let mut w = wallet_signals();
     let bank_address = pacanele2_client::get_bank_address().0;
     let delete_me = move |account| {
-        accounts.write().retain(|k| k.keypair().pubkey() != account);
+        w.all_wallets.write().retain(|k| k.keypair().pubkey() != account);
     };
 
     let send_money = move |(sender, target, amount)| {
-        let accounts = accounts.peek();
+        let accounts = w.all_wallets.peek();
         let v = accounts
             .iter()
             .filter(|k| k.keypair().pubkey() == sender)
@@ -356,7 +362,8 @@ fn PlayerAccountList(accounts: Signal<Vec<SerializedKeypair>>) -> Element {
     rsx! {
         div {
             style: "border: 1px solid black;",
-            h1 {                "Bank"             }
+            h3 { a { href : "/", "Back to main page."}}
+            h1 {                "Program Bank"             }
             PlayerAccountDisplay {account:bank_address, on_forget:delete_me, send_money}
 
             h1 {
@@ -367,7 +374,10 @@ fn PlayerAccountList(accounts: Signal<Vec<SerializedKeypair>>) -> Element {
                     onclick: move |_| async move {
                         info!("add account!");
                         let key = pacanele2_client::create_new_keypair();
-                        accounts.write().push(key.into());
+                        let pk = key.pubkey();
+                        w.all_wallets.write().push(key.into());
+                        
+                        w.set_current_wallet.call(Some(pk));
                     },
                     "+ add new account"
                 }
@@ -381,7 +391,9 @@ fn PlayerAccountList(accounts: Signal<Vec<SerializedKeypair>>) -> Element {
                         info!("import acount!");
                         if let Some(json_b) = parsed_keypair.read().as_ref()  {
                             if let Ok(key) = pacanele2_client::Keypair::from_bytes(&json_b) {
-                                accounts.write().push(key.into());
+                                let pk = key.pubkey();
+                                w.all_wallets.write().push(key.into());
+                                w.set_current_wallet.call(Some(pk));
                             }
                         }
                     },
@@ -390,7 +402,7 @@ fn PlayerAccountList(accounts: Signal<Vec<SerializedKeypair>>) -> Element {
             }
 
             ul {
-                for account in accounts.read().iter().cloned() {
+                for account in w.all_wallets.read().iter().cloned() {
                     li {
                         key: account.keypair().pubkey().to_string(),
                         PlayerAccountDisplay {account: account.keypair().pubkey(), on_forget:delete_me, send_money:send_money}
