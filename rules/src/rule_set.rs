@@ -17,7 +17,7 @@ pub fn make_random_prob_space(len: usize) -> Vec<u16> {
     // pick random values but keep min,max
     let mut r = rand::thread_rng();
     // prob_var = how many times more probable one chip is as to another
-    let prob_var = 4.0;
+    let prob_var = 2.0;
     let mut some_prob = vec![];
     for _ in 0..(len - 2) {
         some_prob.push(r.gen_range(1.0..prob_var));
@@ -181,7 +181,7 @@ impl RuleSet {
                 let prob = get_prob_for_index_and_density(&prob, *fruit, score, wheel_count);
                 assert!(prob > 0.0);
                 assert!(prob < 1.0);
-                let max_reward = (desired_pay / prob / fruits_len_f64).clamp(0.0, 55666.0);
+                let max_reward = (desired_pay / prob / fruits_len_f64).clamp(0.0, 55666.0).powf(0.8);
                 let max_reward_i = max_reward as u64;
                 let r_u16 = max_reward_i.clamp(0, 55666) as u16;
                 // println!("{fruit}x{score}   =>>>   reward_f: {max_reward}, reward_i: {max_reward_i}, reward_u16 = {r_u16}");

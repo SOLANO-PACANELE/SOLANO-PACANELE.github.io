@@ -26,19 +26,16 @@ fn random_spin_period(on_autoplay: bool) -> f64 {
 
 #[component]
 pub fn Pacanele() -> Element {
-    info!("Paccanlee()");
-
     let pcnl_count: u32 = 3;
 
     let mut pcnl_state = use_signal(|| None);
     let mut shuf_state = use_signal(|| None);
     let enable_autoplay = use_signal(|| false);
     let _init_state = use_resource(move || async move {
-        info!("init_state");
         let mut v = vec![];
         let mut v2 = vec![];
         for i in 0..pcnl_count {
-            let shuffle = get_wheel_shuffle(i, pcnl_count).await.unwrap();
+            let shuffle = get_wheel_shuffle(i, pcnl_count);
             let shuf_idx = shuffle
                 .iter()
                 .enumerate()
@@ -72,7 +69,6 @@ pub fn Pacanele() -> Element {
             last_messages: vec![],
         }));
         shuf_state.set(Some(ShuffleState { wheels: v2 }));
-        info!("init state done");
     });
 
     rsx! {
@@ -227,7 +223,6 @@ fn SpinButton(
     pcnl_count: u32,
     enable_autoplay: ReadOnlySignal<bool>,
 ) -> Element {
-    info!("SpinButton()");
     let wallet: crate::wallet::WalletSignals = wallet_signals();
 
     let mut effects_running = use_signal(|| false);
@@ -398,7 +393,6 @@ fn SpinButton(
 
             {
                 if *wheels_ready.read() && !*effects_running.read() && *have_money.read() {
-                    info!("spin button on");
                     rsx! {
                         button {
                             style: "width: 100%; height: 100%;",
@@ -412,7 +406,6 @@ fn SpinButton(
                         }
                     }
                 } else {
-                    info!("spin button off");
                     if !*have_money.read() {
                         rsx! {
                             h1 {
@@ -507,7 +500,6 @@ fn SlotWheelRow(
     shuf_state: ReadOnlySignal<Option<ShuffleState>>,
     pcnl_count: u32,
 ) -> Element {
-    info!("SlotWheelRow()");
     rsx! {
         for i in 0..pcnl_count {
             SlotWheelX { pcnl_id: i, pcnl_state, shuf_state }

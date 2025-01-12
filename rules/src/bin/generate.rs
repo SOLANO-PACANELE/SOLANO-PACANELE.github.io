@@ -1,7 +1,7 @@
 use rules::rule_set::RuleSet;
 
 pub fn main() {
-    let r = RuleSet::random_rule_set(0.96);
+    let r = RuleSet::random_rule_set(0.90);
     println!("{:#?}", r);
     let json = r.serialize();
     let mut file = std::fs::File::create("src/default_pacanea_rule_set.bin").unwrap();

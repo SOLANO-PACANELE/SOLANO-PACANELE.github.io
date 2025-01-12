@@ -23,7 +23,6 @@ pub const TRACKS: [fn(SoundSequenceInfo, SoundTrackOutput) -> SoundTrackOutput; 
 fn random_arp_note(base: u8, prev_note: u8, arp: &[u8]) -> u8 {
     use rand::{thread_rng, Rng};
     if arp.is_empty() {
-        info!("empty arp");
         return base;
     }
     if arp.len() == 1 {

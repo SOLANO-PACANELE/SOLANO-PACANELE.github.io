@@ -8,8 +8,8 @@
         "rules/Cargo.toml",
     ],
     "rust-analyzer.cargo.features": [
-        // "rules/generate",
-        // "rules/constructors",
+        "rules/generate",
+        "rules/constructors",
         // "web_pacanele/server",
     ],
     "rust-analyzer.statusBar.documentSelector": [

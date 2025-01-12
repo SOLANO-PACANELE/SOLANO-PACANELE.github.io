@@ -64,7 +64,6 @@ pub fn init_make_wallet_selector() {
         let all_wallets = all_wallets.read().clone();
 
         async move {
-            info!("wallet_balance()");
             let client = pacanele2_client::get_client().await;
             let mut hash = HashMap::<Pubkey, Option<Account>>::new();
             for w in all_wallets.iter() {
@@ -77,7 +76,6 @@ pub fn init_make_wallet_selector() {
 
     let mut current_sol = use_signal(move || 0.0);
     use_effect(move || {
-        info!("current_sol()");
         let w2 = wallet_balance.read();
 
         if let Some(key) = *current_wallet.read() {
@@ -85,10 +83,8 @@ pub fn init_make_wallet_selector() {
                 if let Some(Some(acc)) = hash.get(&key) {
                     let val = acc.lamports as f64 / 1000000000.0;
                     current_sol.set(val);
-                    info!("current sol = {}", val);
                 } else {
                     current_sol.set(0.0);
-                    info!("current sol = {}", 0.0);
                 }
             } else {
                 info!("no current hash!");
@@ -133,7 +129,6 @@ pub fn init_make_wallet_selector() {
 
     let mut all_wallets_pk = use_signal(move || vec![]);
     use_effect(move || {
-        info!("all_wallets()");
         let w = all_wallets
             .read()
             .iter()
@@ -143,7 +138,6 @@ pub fn init_make_wallet_selector() {
     });
 
     let do_refresh_values = Callback::new(move |_| {
-        info!("wallet do refresh values!");
         wallet_balance.restart();
     });
 
@@ -237,10 +231,8 @@ pub fn BetAmountControl() -> Element {
 #[component]
 pub fn CurrentWalletDropdown() -> Element {
     let w: WalletSignals = wallet_signals();
-    info!("CurrentWalletDropdown");
 
     let ev_to_data = move |_ev: Event<FormData>| -> String {
-        // info!("VAL: {_ev:?}");
         let data = _ev.data().clone();
         let value = data.value();
         value
@@ -322,7 +314,6 @@ impl SerializedKeypair {
 
 #[component]
 pub fn WalletDashboard() -> Element {
-    info!("WalletDashboard()");
     rsx! {
         PlayerAccountList {accounts:wallet_signals().all_wallets}
     }
@@ -356,6 +347,12 @@ fn PlayerAccountList(accounts: Signal<Vec<SerializedKeypair>>) -> Element {
         }
     };
 
+    let mut import_private_key_json = use_signal(move || "".to_string());
+    let parsed_keypair = use_memo(move || {
+        let Ok(b) = serde_json::from_str::<Vec<u8>>(import_private_key_json.read().as_ref()) else {return None;};
+        Some(b)
+    });
+
     rsx! {
         div {
             style: "border: 1px solid black;",
@@ -372,7 +369,23 @@ fn PlayerAccountList(accounts: Signal<Vec<SerializedKeypair>>) -> Element {
                         let key = pacanele2_client::create_new_keypair();
                         accounts.write().push(key.into());
                     },
-                    "+ add account"
+                    "+ add new account"
+                }
+                br {}
+                input {
+                    value: "{import_private_key_json}",
+                    oninput: move |event| import_private_key_json.set(event.value())
+                }
+                button {
+                    onclick: move |_| {
+                        info!("import acount!");
+                        if let Some(json_b) = parsed_keypair.read().as_ref()  {
+                            if let Ok(key) = pacanele2_client::Keypair::from_bytes(&json_b) {
+                                accounts.write().push(key.into());
+                            }
+                        }
+                    },
+                    "+ import private key json"
                 }
             }
 

@@ -9,46 +9,114 @@ use solana_program::clock::Clock;
 use solana_program::program::set_return_data;
 use solana_program::program_error::ProgramError;
 use solana_program::sysvar::Sysvar;
+use solana_program::serialize_utils::read_u16;
+use solana_program::serialize_utils::read_pubkey;
 
 entrypoint!(process_instruction);
 
 struct InputParameters<'a, 'b> {
-    sysvar_slot_history: &'b AccountInfo<'a>,
+    sysvar_slot_hashes: &'b AccountInfo<'a>,
     bank_account: &'b AccountInfo<'a>,
     bank_bump: u8,
     player_account: &'b AccountInfo<'a>,
     system_program: &'b AccountInfo<'a>,
     bet_amount: u64,
+    program_id: Pubkey,
+    program_account: &'b AccountInfo<'a>,
+}
+
+
+pub fn get_program_id<'info>(info: AccountInfo<'info>) -> Result<Pubkey, ProgramError> {
+    let instruction_sysvar = info.data.borrow();
+    let mut idx = 0;
+    let num_instructions = read_u16(&mut idx, &instruction_sysvar).map_err(|_e| ProgramError::Custom(1))?;
+
+    for index in 0..num_instructions {
+        let mut current = 2 + (index * 2) as usize;
+        let start = read_u16(&mut current, &instruction_sysvar).unwrap();
+
+        current = start as usize;
+        let num_accounts = read_u16(&mut current, &instruction_sysvar).unwrap();
+        current += (num_accounts as usize) * (1 + 32);
+        let program_id = read_pubkey(&mut current, &instruction_sysvar).unwrap();
+
+        if program_id == Pubkey::from_str_const("ComputeBudget111111111111111111111111111111") {
+            continue;
+        }
+        if program_id == Pubkey::from_str_const("11111111111111111111111111111111") {
+            continue;
+        }
+        return Ok(program_id);
+
+    }
+
+    Err(ProgramError::Custom(2))
 }
 
 fn extract_input<'a, 'b>(_accounts: &'b [AccountInfo<'a>], _instruction_data: &[u8]) -> Result<InputParameters<'a, 'b>, ProgramError> {
     let accounts_iter = &mut _accounts.iter();
-    let sysvar_slot_history = next_account_info(accounts_iter)?;
+    let sysvar_instructions = next_account_info(accounts_iter)?;
+    solana_program::sysvar::instructions::check_id(&sysvar_instructions.key);
+    let program_id = get_program_id(sysvar_instructions.clone())?;
+    
+    let sysvar_slot_hashes = next_account_info(accounts_iter)?;
+    solana_program::sysvar::slot_hashes::check_id(&sysvar_slot_hashes.key);
+    
+    let system_program = next_account_info(accounts_iter)?;
+    solana_program::system_program::check_id(&system_program.key);
+
     let bank_account = next_account_info(accounts_iter)?;
     let bank_bump = _instruction_data[0];
+    let x = solana_program::pubkey::Pubkey::find_program_address(&[b"bank"], &program_id);
+    assert!(x.0 == *bank_account.key);
+    assert!(x.1 == bank_bump);
+
     let player_account = next_account_info(accounts_iter)?;
-    let system_program = next_account_info(accounts_iter)?;
+    assert!(_instruction_data[1] > 10 && _instruction_data[1] < 63);
     let bet_amount = 1_u64 <<( _instruction_data[1] as u64);
+    assert!(bet_amount > 33 * 5000);
+    assert!(bet_amount < player_account.lamports());
+    assert!(bet_amount < bank_account.lamports());
+    
+    let program_account = next_account_info(accounts_iter)?;
+    assert!(*program_account.key == program_id);
+
     Ok(InputParameters {
-        sysvar_slot_history,bank_account,bank_bump,player_account,system_program, bet_amount
+        sysvar_slot_hashes,bank_account,bank_bump,player_account,system_program, bet_amount, program_id, program_account
     })
 }
 
-fn invoke_transfer_player_to_bank(input: &InputParameters, amount: u64) -> Result<(), ProgramError> {
+fn invoke_transfer_player_to_bank(input: &InputParameters, bet_amount: u64) -> Result<(), ProgramError> {
     // msg!("insert coin: {} lamports", amount);
-    let insert_coin_instruction = solana_program::system_instruction::transfer(
-        input.player_account.key,
-        input.bank_account.key,
-        amount,
-    );
+    // keep 3.33% in program account
+    // let program_fee_amount = bet_amount / 33;
+    // let bank_amount = bet_amount - program_fee_amount;
     solana_program::program::invoke(
-        &insert_coin_instruction,
+        &solana_program::system_instruction::transfer(
+            input.player_account.key,
+            input.bank_account.key,
+            bet_amount,
+        ),
         &[
             input.player_account.to_owned(),
             input.bank_account.to_owned(),
             input.system_program.to_owned(),
         ],
     )?;
+    
+    // solana_program::program::invoke(
+    //     &solana_program::system_instruction::transfer(
+    //         input.player_account.key,
+    //         input.program_account.key,
+    //         program_fee_amount,
+    //     ),
+    //     &[
+    //         input.player_account.to_owned(),
+    //         input.program_account.to_owned(),
+    //         input.system_program.to_owned(),
+    //     ],
+    // )?;
+    
 
     Ok(())
 }
@@ -90,7 +158,7 @@ pub fn process_instruction(
     // msg!("after insert coin:");    ::solana_program::log::sol_log_compute_units();
 
     // compute funny random
-    let not_random = not_really_random(input.sysvar_slot_history, 0)?;
+    let not_random = not_really_random(input.sysvar_slot_hashes, 0)?;
     // msg!("funny random: {:?}", not_random);
 
     
@@ -118,7 +186,8 @@ pub fn process_instruction(
 
     // send win back
     if win > 0 {
-        let win_lamports = input.bet_amount * win;
+        let max_payable = input.bank_account.lamports()/2-890880*2;
+        let win_lamports = (input.bet_amount * win).min(max_payable);
         invoke_transfer_bank_to_player(&input, win_lamports)?;
     }
 

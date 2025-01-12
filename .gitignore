@@ -7,3 +7,4 @@ test-ledger
 .yarn
 target_rust_analyzer
 target_docker
+.keys
